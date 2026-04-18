@@ -138,33 +138,40 @@ def _parse_cms_record(record: dict) -> dict:
 
 
 def _fetch_website_contacts(website_url: str) -> dict:
-    """Scrape contact email/phone/LinkedIn from facility website via Apify."""
+    """Scrape contact email/phone from facility website using Apify website-content-crawler."""
     if not settings.apify_api_key or not website_url:
         return {}
     try:
         from apify_client import ApifyClient
+        import re
         client = ApifyClient(settings.apify_api_key)
-        run = client.actor("lukaskrivka~google-maps-with-contact-details").call(
-            run_input={"startUrls": [{"url": website_url}], "maxDepth": 1, "maxPagesPerDomain": 5},
-            timeout_secs=90,
+        # Use website-content-crawler to get text, then extract emails with regex
+        run = client.actor("apify~website-content-crawler").call(
+            run_input={
+                "startUrls": [{"url": website_url}],
+                "maxCrawlPages": 5,
+                "maxCrawlDepth": 1,
+                "crawlerType": "cheerio",
+            },
+            timeout_secs=120,
         )
-        items = list(client.dataset(run["defaultDatasetId"]).iterate_items())
-        if not items:
-            return {}
-        item = items[0]
         result: dict = {}
-        emails = item.get("emails", [])
-        if emails:
-            first = emails[0]
-            result["contact_email"] = first if isinstance(first, str) else first.get("email", "")
-            result["all_emails"] = [e if isinstance(e, str) else e.get("email", "") for e in emails[:5]]
-        phones = item.get("phones", [])
-        if phones:
-            first_p = phones[0]
-            result["contact_phone"] = first_p if isinstance(first_p, str) else first_p.get("phone", "")
-        social = item.get("linkedIns", [])
-        if social:
-            result["linkedin_company_url"] = social[0]
+        emails_found: set = set()
+        phones_found: set = set()
+        for item in client.dataset(run["defaultDatasetId"]).iterate_items():
+            text = item.get("text", "") or item.get("markdown", "") or ""
+            # Extract emails
+            for email in re.findall(r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}", text):
+                if not any(skip in email.lower() for skip in ["example", "placeholder", "noreply", "no-reply"]):
+                    emails_found.add(email.lower())
+            # Extract phone numbers
+            for phone in re.findall(r"\(?\d{3}\)?[\s.\-]?\d{3}[\s.\-]?\d{4}", text):
+                phones_found.add(phone)
+        if emails_found:
+            result["contact_email"] = sorted(emails_found)[0]
+            result["all_emails"] = sorted(emails_found)[:5]
+        if phones_found:
+            result["contact_phone"] = sorted(phones_found)[0]
         return result
     except Exception:
         return {}
