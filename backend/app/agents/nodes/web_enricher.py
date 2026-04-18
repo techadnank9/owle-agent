@@ -272,14 +272,36 @@ def _fetch_linkedin_profiles(facility_name: str, location: str, company_linkedin
                     timeout_secs=120,
                 )
                 for item in client.dataset(run2["defaultDatasetId"]).iterate_items():
+                    # harvestapi returns firstName/lastName separately, headline as title
+                    first = item.get("firstName", "")
+                    last = item.get("lastName", "")
+                    full_name = item.get("fullName", "") or f"{first} {last}".strip() or item.get("name", "")
+                    headline = item.get("headline", "")
+                    # Extract job title from headline or currentPosition
+                    job_title = item.get("jobTitle", "") or item.get("title", "")
+                    if not job_title and headline:
+                        # e.g. "Administrator Sunnyvale Gardens Post Acute" → "Administrator"
+                        job_title = headline.split(" ")[0] if headline else ""
+                    # Extract company from currentPosition
+                    company = item.get("companyName", "") or item.get("company", "")
+                    if not company:
+                        pos = item.get("currentPosition", [])
+                        if pos and isinstance(pos, list):
+                            company = pos[0].get("companyName", "") if pos else ""
+                    # Location
+                    loc_raw = item.get("location", "") or item.get("geoLocationName", "")
+                    if isinstance(loc_raw, dict):
+                        loc_str = loc_raw.get("parsed", {}).get("text", "") or loc_raw.get("linkedinText", "")
+                    else:
+                        loc_str = str(loc_raw)
                     profiles.append({
-                        "full_name": item.get("fullName", "") or item.get("name", ""),
-                        "headline": item.get("headline", ""),
-                        "job_title": item.get("jobTitle", "") or item.get("title", ""),
-                        "company": item.get("companyName", "") or item.get("company", ""),
-                        "email": item.get("email", ""),
+                        "full_name": full_name,
+                        "headline": headline,
+                        "job_title": job_title,
+                        "company": company,
+                        "email": item.get("email", "") or item.get("emails", [""])[0] if item.get("emails") else "",
                         "linkedin_url": item.get("linkedinUrl", "") or item.get("profileUrl", ""),
-                        "location": item.get("geoLocationName", "") or item.get("location", ""),
+                        "location": loc_str,
                     })
                 enriched = True
             except Exception:
