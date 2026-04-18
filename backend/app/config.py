@@ -8,6 +8,8 @@ class Settings(BaseSettings):
     database_url: str
     langsmith_api_key: str = ""
     langchain_tracing_v2: bool = False
+    gmail_token: str = ""
+    gmail_sender_email: str = ""
 
     model_config = {"env_file": ".env"}
 
