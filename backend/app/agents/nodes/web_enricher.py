@@ -170,6 +170,7 @@ def _fetch_website_contacts(website_url: str) -> dict:
         result: dict = {}
         emails_found: set = set()
         phones_found: set = set()
+        linkedin_company_urls: set = set()
         for item in client.dataset(run["defaultDatasetId"]).iterate_items():
             text = item.get("text", "") or item.get("markdown", "") or ""
             # Extract emails
@@ -179,19 +180,30 @@ def _fetch_website_contacts(website_url: str) -> dict:
             # Extract phone numbers
             for phone in re.findall(r"\(?\d{3}\)?[\s.\-]?\d{3}[\s.\-]?\d{4}", text):
                 phones_found.add(phone)
+            # Extract LinkedIn company URLs from text/links
+            for li_url in re.findall(r"https?://(?:www\.)?linkedin\.com/company/[a-zA-Z0-9\-_/]+", text):
+                linkedin_company_urls.add(li_url.rstrip("/"))
+            # Also check metadata/links field if present
+            for link in item.get("links", []):
+                href = link.get("href", "") if isinstance(link, dict) else str(link)
+                if "linkedin.com/company/" in href:
+                    linkedin_company_urls.add(href.split("?")[0].rstrip("/"))
         if emails_found:
             result["contact_email"] = sorted(emails_found)[0]
             result["all_emails"] = sorted(emails_found)[:5]
         if phones_found:
             result["contact_phone"] = sorted(phones_found)[0]
+        if linkedin_company_urls:
+            result["linkedin_company_url"] = sorted(linkedin_company_urls)[0]
         return result
     except Exception:
         return {}
 
 
-def _fetch_linkedin_profiles(facility_name: str, location: str) -> tuple[list[dict], str]:
-    """Find decision-maker LinkedIn profiles using harvestapi/linkedin-profile-search
-    (no Tavily, no cookies). Returns (profiles, company_linkedin_url)."""
+def _fetch_linkedin_profiles(facility_name: str, location: str, company_linkedin_url: str = "") -> tuple[list[dict], str]:
+    """Find decision-maker LinkedIn profiles.
+    If company_linkedin_url is provided (from website crawl), use it directly.
+    Otherwise search via harvestapi. Returns (profiles, company_linkedin_url)."""
     if not settings.apify_api_key:
         return [], ""
     try:
@@ -199,25 +211,48 @@ def _fetch_linkedin_profiles(facility_name: str, location: str) -> tuple[list[di
         client = ApifyClient(settings.apify_api_key)
 
         profiles = []
-        company_url = ""
+        company_url = company_linkedin_url or ""
         linkedin_urls: list[str] = []
 
-        # Search LinkedIn for Administrators and DONs at this facility
-        for title in ["Administrator", "Director of Nursing"]:
+        # Step A: If we have the company LinkedIn URL, scrape employees directly
+        if company_url:
             try:
-                run = client.actor("harvestapi~linkedin-profile-search").call(
+                run_co = client.actor("curious_coder~linkedin-company-scraper").call(
                     run_input={
-                        "searchQuery": f"{title} {facility_name}",
-                        "currentJobTitles": [title],
-                        "maxItems": 3,
+                        "startUrls": [{"url": f"{company_url}/people/"}],
+                        "maxItems": 10,
                     },
-                    timeout_secs=60,
+                    timeout_secs=90,
                 )
-                for item in client.dataset(run["defaultDatasetId"]).iterate_items():
-                    url = item.get("profileUrl") or item.get("linkedinUrl") or item.get("url", "")
-                    if url and "linkedin.com/in/" in url:
-                        clean = url.split("?")[0]
-                        if clean not in linkedin_urls:
+                for item in client.dataset(run_co["defaultDatasetId"]).iterate_items():
+                    title_val = item.get("title", "") or item.get("headline", "")
+                    # Only keep decision-makers
+                    if any(t in title_val.lower() for t in ["administrator", "director", "don", "coo", "ceo", "vp", "president", "manager"]):
+                        url = item.get("profileUrl") or item.get("linkedinUrl", "")
+                        if url and "linkedin.com/in/" in url:
+                            clean = url.split("?")[0]
+                            if clean not in linkedin_urls:
+                                linkedin_urls.append(clean)
+            except Exception:
+                pass
+
+        # Step B: Search LinkedIn for Administrators and DONs at this facility
+        if not linkedin_urls:
+            for title in ["Administrator", "Director of Nursing"]:
+                try:
+                    run = client.actor("harvestapi~linkedin-profile-search").call(
+                        run_input={
+                            "searchQuery": f"{title} {facility_name}",
+                            "currentJobTitles": [title],
+                            "maxItems": 3,
+                        },
+                        timeout_secs=60,
+                    )
+                    for item in client.dataset(run["defaultDatasetId"]).iterate_items():
+                        url = item.get("profileUrl") or item.get("linkedinUrl") or item.get("url", "")
+                        if url and "linkedin.com/in/" in url:
+                            clean = url.split("?")[0]
+                            if clean not in linkedin_urls:
                             linkedin_urls.append(clean)
                     if not company_url:
                         company_url = item.get("companyLinkedinUrl", "")
@@ -373,8 +408,9 @@ def web_enricher_node(state: AgentState) -> dict:
 
     # Step 3: LinkedIn decision-maker profiles + company page (no Tavily needed)
     loc = account_data.get("location", "")
+    existing_company_url = account_data.get("linkedin_company_url", "")
     if settings.apify_api_key and not account_data.get("linkedin_profiles"):
-        linkedin_profiles, company_linkedin = _fetch_linkedin_profiles(name, loc)
+        linkedin_profiles, company_linkedin = _fetch_linkedin_profiles(name, loc, existing_company_url)
         if company_linkedin and not account_data.get("linkedin_company_url"):
             account_data["linkedin_company_url"] = company_linkedin
         if linkedin_profiles:
