@@ -69,12 +69,43 @@ def test_graph_runs_through_outreach_generator():
     }
     config = {"configurable": {"thread_id": "test-thread-001"}}
 
+    stakeholder_tool_response = make_claude_tool_response({
+        "contacts": [],
+        "primary_contact_index": 0,
+        "rationale": "No contacts found",
+    })
+
+    strategy_tool_response = make_claude_tool_response({
+        "action": "pursue",
+        "channel": "email",
+        "lead_type": "founder_led",
+        "angle": "documentation burden reduction",
+        "rationale": "High ICP fit",
+        "verified_facts": {},
+        "inferred_assumptions": {},
+    })
+
+    outreach_tool_response = make_claude_tool_response({
+        "email_subject": "Test subject",
+        "email_body": "Test email body",
+        "linkedin_message": "Test LinkedIn",
+        "rationale": "Test rationale",
+    })
+
     with patch("app.agents.nodes.account_selector.call_claude", return_value=account_selector_tool_response), \
          patch("app.agents.nodes.account_selector.write_audit_log"), \
-         patch("app.agents.nodes.account_selector.update_account"):
+         patch("app.agents.nodes.account_selector.update_account"), \
+         patch("app.agents.nodes.stakeholder_mapper.call_claude", return_value=stakeholder_tool_response), \
+         patch("app.agents.nodes.stakeholder_mapper.write_audit_log"), \
+         patch("app.agents.nodes.stakeholder_mapper.upsert_contacts"), \
+         patch("app.agents.nodes.strategy_decider.call_claude", return_value=strategy_tool_response), \
+         patch("app.agents.nodes.strategy_decider.write_audit_log"), \
+         patch("app.agents.nodes.outreach_generator.call_claude", return_value=outreach_tool_response), \
+         patch("app.agents.nodes.outreach_generator.write_audit_log"), \
+         patch("app.agents.nodes.outreach_generator.create_outreach_action", return_value={"id": "a1"}):
         result = graph.invoke(initial_state, config)
 
     assert result["icp_score"] == 90.0
     assert result["contacts"] == []
-    assert result["email_draft"] == "stub email body"
+    assert result["email_draft"] == "Test email body"
     assert len(result["audit_entries"]) == 4
