@@ -239,62 +239,80 @@ export default function AccountDetailPage({ params }: { params: Promise<{ id: st
         )}
       </div>
 
-      {/* Contacts & LinkedIn Profiles */}
-      {(contacts.length > 0 || linkedinProfiles.length > 0) && (
-        <div className="bg-white border rounded-xl p-5">
-          <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-4">Contacts & Decision Makers</p>
+      {/* Contacts & Decision Makers — always shown */}
+      <div className="bg-white border rounded-xl p-5">
+        <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-4">Contacts & Decision Makers</p>
 
-          {/* Supabase contacts (from stakeholder_mapper) */}
-          {contacts.length > 0 && (
-            <div className="flex flex-col gap-3 mb-4">
-              {contacts.map(c => (
-                <div key={c.id} className="flex items-start gap-3 p-3 rounded-lg bg-gray-50 border">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-sm font-medium text-gray-900">{c.name || "Unknown"}</p>
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">{c.title}</span>
-                      <span className={`text-xs px-1.5 py-0.5 rounded ${c.source === "verified" ? "bg-green-50 text-green-600" : "bg-amber-50 text-amber-600"}`}>
-                        {c.source}
-                      </span>
-                    </div>
-                    <div className="flex gap-4 mt-1 flex-wrap">
-                      {c.email && <a href={`mailto:${c.email}`} className="text-xs text-blue-500 hover:underline">{c.email}</a>}
-                      {c.linkedin_url && <a href={c.linkedin_url} target="_blank" rel="noreferrer" className="text-xs text-blue-400 hover:underline">LinkedIn →</a>}
-                    </div>
-                  </div>
-                  {c.confidence != null && (
-                    <span className="text-xs text-gray-400 shrink-0">{Math.round(c.confidence * 100)}% conf</span>
-                  )}
-                </div>
+        {/* Emails found from website crawler */}
+        {raw && (raw.all_emails || raw.contact_email) && (
+          <div className="mb-4 p-3 rounded-lg bg-green-50 border border-green-100">
+            <p className="text-xs font-medium text-green-700 mb-2">Emails from website</p>
+            <div className="flex flex-wrap gap-2">
+              {((raw.all_emails as unknown as string[]) ?? [raw.contact_email]).filter(Boolean).map((email, i) => (
+                <a key={i} href={`mailto:${email}`}
+                  className="text-xs text-green-800 bg-green-100 px-2 py-1 rounded hover:bg-green-200 font-mono">
+                  {email}
+                </a>
               ))}
             </div>
-          )}
+          </div>
+        )}
 
-          {/* LinkedIn profiles from web_enricher (dev_fusion scraper) */}
-          {linkedinProfiles.length > 0 && (
-            <div>
-              {contacts.length > 0 && <p className="text-xs text-gray-400 mb-2 mt-2">LinkedIn profiles found</p>}
-              <div className="flex flex-col gap-3">
-                {linkedinProfiles.map((p, i) => (
-                  <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-blue-50 border border-blue-100">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-sm font-medium text-gray-900">{p.full_name}</p>
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-600">{p.job_title || p.headline}</span>
-                      </div>
-                      {p.location && <p className="text-xs text-gray-400 mt-0.5">{p.location}</p>}
-                      <div className="flex gap-4 mt-1 flex-wrap">
-                        {p.email && <a href={`mailto:${p.email}`} className="text-xs text-blue-500 hover:underline">{p.email}</a>}
-                        {p.linkedin_url && <a href={p.linkedin_url} target="_blank" rel="noreferrer" className="text-xs text-blue-400 hover:underline">View Profile →</a>}
-                      </div>
-                    </div>
+        {/* LinkedIn profiles from dev_fusion (verified) */}
+        {linkedinProfiles.length > 0 && (
+          <div className="flex flex-col gap-2 mb-4">
+            <p className="text-xs font-medium text-blue-600 mb-1">LinkedIn profiles — verified</p>
+            {linkedinProfiles.map((p, i) => (
+              <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-blue-50 border border-blue-100">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-sm font-semibold text-gray-900">{p.full_name || "Unknown"}</p>
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">{p.job_title || p.headline}</span>
                   </div>
-                ))}
+                  {p.location && <p className="text-xs text-gray-400 mt-0.5">{p.location}</p>}
+                  <div className="flex gap-4 mt-1 flex-wrap">
+                    {p.email && <a href={`mailto:${p.email}`} className="text-xs text-blue-700 hover:underline font-medium">{p.email}</a>}
+                    {p.linkedin_url && <a href={p.linkedin_url} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline">View LinkedIn →</a>}
+                  </div>
+                </div>
               </div>
-            </div>
-          )}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
+
+        {/* Contacts from stakeholder_mapper */}
+        {contacts.length > 0 && (
+          <div className="flex flex-col gap-2">
+            {(linkedinProfiles.length > 0 || raw?.contact_email) && (
+              <p className="text-xs text-gray-400 mb-1">Inferred roles</p>
+            )}
+            {contacts.map(c => (
+              <div key={c.id} className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 border">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-sm font-medium text-gray-900">{c.name || "Unknown"}</p>
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">{c.title}</span>
+                    <span className={`text-xs px-1.5 py-0.5 rounded ${c.source === "verified" ? "bg-green-50 text-green-600" : "bg-amber-50 text-amber-600"}`}>
+                      {c.source}
+                    </span>
+                  </div>
+                  <div className="flex gap-4 mt-0.5 flex-wrap">
+                    {c.email && <a href={`mailto:${c.email}`} className="text-xs text-blue-500 hover:underline">{c.email}</a>}
+                    {c.linkedin_url && <a href={c.linkedin_url} target="_blank" rel="noreferrer" className="text-xs text-blue-400 hover:underline">LinkedIn →</a>}
+                  </div>
+                </div>
+                {c.confidence != null && (
+                  <span className="text-xs text-gray-400 shrink-0">{Math.round(c.confidence * 100)}% conf</span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {contacts.length === 0 && linkedinProfiles.length === 0 && !raw?.contact_email && (
+          <p className="text-sm text-gray-400">No contacts yet — click <strong>Enrich & Re-score</strong> to find emails and LinkedIn profiles.</p>
+        )}
+      </div>
 
       {/* Audit Log */}
       <div>
