@@ -17,6 +17,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <aside className="w-56 bg-white border-r flex flex-col gap-1 p-4 shrink-0">
             <p className="text-sm font-semibold text-gray-900 mb-4">Owle AI</p>
             <NavLink href="/accounts">Accounts</NavLink>
+            <NavLink href="/search">Search SNFs</NavLink>
             <NavLink href="/queue">Approval Queue</NavLink>
             <NavLink href="/inbox">Reply Inbox</NavLink>
             <NavLink href="/how-it-works">How It Works</NavLink>

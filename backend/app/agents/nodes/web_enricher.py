@@ -1,13 +1,20 @@
 """
 Web enricher node — runs before account_selector.
-Searches the web for facility details (name, bed count, location, type)
-when the account_data is sparse (e.g. only an email was provided).
-Skips enrichment if bed_count and location are already present.
+
+Step 1 (always): CMS Provider Data API lookup — free, no key needed.
+  Returns bed count, CMS rating, staffing rating, ownership type, payer mix.
+Step 2 (fallback): Tavily web search — only if CMS lookup fails and TAVILY_API_KEY set.
 """
 import json
 from ..state import AgentState
 from ...config import settings
 from ...supabase_client import write_audit_log, update_account
+
+CMS_API = "https://data.cms.gov/provider-data/api/1/datastore/query/4pq5-n9py/0"
+
+
+def _needs_bed_count(account_data: dict) -> bool:
+    return not bool(account_data.get("bed_count") or account_data.get("beds"))
 
 
 def _needs_enrichment(account_data: dict) -> bool:
@@ -16,16 +23,125 @@ def _needs_enrichment(account_data: dict) -> bool:
     return not (has_bed_count and has_location)
 
 
+def _cms_lookup(name: str, state: str | None, city: str | None) -> dict | None:
+    """Query CMS Provider Data API. Returns best matching record or None."""
+    try:
+        import httpx
+        search_name = (
+            name.upper()
+            .replace(" INC.", "").replace(" LLC", "").replace(", INC", "")
+            .replace(" AND ", " ").strip()
+        )
+        params: dict = {"limit": 5, "offset": 0, "keywords": search_name}
+        # CMS API filter syntax: conditions[N][property/value/operator]
+        cond_index = 0
+        if state:
+            params[f"conditions[{cond_index}][property]"] = "state"
+            params[f"conditions[{cond_index}][value]"] = state.upper()
+            params[f"conditions[{cond_index}][operator]"] = "="
+            cond_index += 1
+        if city:
+            params[f"conditions[{cond_index}][property]"] = "citytown"
+            params[f"conditions[{cond_index}][value]"] = city.upper()
+            params[f"conditions[{cond_index}][operator]"] = "="
+
+        r = httpx.get(CMS_API, params=params, timeout=10,
+                      headers={"User-Agent": "owle-agent/1.0"})
+        data = r.json()
+
+        results = data.get("results", data.get("data", []))
+        if not results:
+            return None
+
+        def score(rec: dict) -> int:
+            prov = (rec.get("provider_name") or "").upper()
+            rec_state = (rec.get("state") or "").upper()
+            name_score = 2 if search_name in prov or prov in search_name else 0
+            state_score = 1 if state and rec_state == state.upper() else 0
+            return name_score + state_score
+
+        best = sorted(results, key=score, reverse=True)[0]
+        best_score = score(best)
+
+        # Reject low-confidence matches — must have at least partial name overlap
+        if best_score == 0:
+            return None
+
+        # Reject if state doesn't match at all (wrong state = wrong facility)
+        if state:
+            rec_state = (best.get("state") or "").upper()
+            if rec_state != state.upper():
+                return None
+
+        return best
+    except Exception:
+        return None
+
+
+def _parse_cms_record(record: dict) -> dict:
+    """Extract relevant fields from a CMS record using actual API field names."""
+    enriched: dict = {"cms_matched": True}
+
+    bed_count = record.get("number_of_certified_beds")
+    if bed_count:
+        try:
+            enriched["bed_count"] = int(float(bed_count))
+        except (ValueError, TypeError):
+            pass
+
+    avg_residents = record.get("average_number_of_residents_per_day")
+    if avg_residents:
+        enriched["avg_residents_per_day"] = str(avg_residents)
+
+    for field, label in [
+        # Quality ratings
+        ("overall_rating", "cms_overall_rating"),
+        ("staffing_rating", "cms_staffing_rating"),
+        ("health_inspection_rating", "cms_health_inspection_rating"),
+        ("qm_rating", "cms_quality_measure_rating"),
+        # Ownership & type
+        ("ownership_type", "ownership_type"),
+        ("provider_type", "provider_type"),
+        ("continuing_care_retirement_community", "is_ccrc"),
+        # Staffing signals
+        ("total_nursing_staff_turnover", "nursing_staff_turnover_pct"),
+        ("registered_nurse_turnover", "rn_turnover_pct"),
+        ("reported_rn_staffing_hours_per_resident_per_day", "rn_hours_per_resident"),
+        ("reported_total_nurse_staffing_hours_per_resident_per_day", "total_nurse_hours_per_resident"),
+        ("number_of_administrators_who_have_left_the_nursing_home", "admin_turnover_count"),
+        # Pain signals — compliance & fines
+        ("number_of_fines", "cms_fines_count"),
+        ("total_amount_of_fines_in_dollars", "cms_fines_total_usd"),
+        ("total_number_of_penalties", "cms_total_penalties"),
+        ("total_weighted_health_survey_score", "cms_health_survey_score"),
+        ("abuse_icon", "cms_abuse_flag"),
+        ("most_recent_health_inspection_more_than_2_years_ago", "cms_inspection_overdue"),
+    ]:
+        val = record.get(field)
+        if val is not None and val != "":
+            enriched[label] = str(val)
+
+    city = record.get("citytown", "")
+    state = record.get("state", "")
+    if city and state:
+        enriched["location"] = f"{city.title()}, {state.upper()}"
+
+    provname = record.get("provider_name")
+    if provname:
+        enriched["cms_provider_name"] = provname.title()
+
+    phone = record.get("telephone_number")
+    if phone and not enriched.get("phone"):
+        enriched["cms_phone"] = str(phone)
+
+    return enriched
+
+
 def _search_facility(query: str) -> list[dict]:
     try:
         from tavily import TavilyClient
         client = TavilyClient(api_key=settings.tavily_api_key)
-        response = client.search(
-            query=query,
-            search_depth="basic",
-            max_results=5,
-            include_answer=True,
-        )
+        response = client.search(query=query, search_depth="basic", max_results=5, include_answer=True)
         return response.get("results", [])
     except Exception:
         return []
@@ -33,23 +149,82 @@ def _search_facility(query: str) -> list[dict]:
 
 def web_enricher_node(state: AgentState) -> dict:
     account_data = dict(state["account_data"])
+    name = account_data.get("name", "")
+    location = account_data.get("location", "")
+    city = account_data.get("city") or (location.split(",")[0].strip() if "," in location else None)
+    raw_state = account_data.get("state") or (location.split(",")[-1].strip() if "," in location else None)
+    # Normalize state — extract 2-letter abbreviation if present (e.g. "California" → None, "CA" → "CA")
+    state_abbr = raw_state.strip()[:2].upper() if raw_state and len(raw_state.strip()) >= 2 else None
 
-    if not settings.tavily_api_key or not _needs_enrichment(account_data):
+    cms_enriched: dict = {}
+    cms_record = _cms_lookup(name, state_abbr, city)
+    if cms_record:
+        cms_enriched = _parse_cms_record(cms_record)
+        account_data.update(cms_enriched)
+
+        db_update: dict = {}
+        if cms_enriched.get("bed_count"):
+            db_update["bed_count"] = cms_enriched["bed_count"]
+        if cms_enriched.get("location") and not account_data.get("location"):
+            db_update["location"] = cms_enriched["location"]
+        if db_update:
+            update_account(state["account_id"], db_update)
+
+        fines = cms_enriched.get("cms_fines_count", "0")
+        fines_usd = cms_enriched.get("cms_fines_total_usd", "0")
+        penalties = cms_enriched.get("cms_total_penalties", "0")
+        abuse_flag = cms_enriched.get("cms_abuse_flag", "N")
+        inspection_overdue = cms_enriched.get("cms_inspection_overdue", "N")
+        nurse_turnover = cms_enriched.get("nursing_staff_turnover_pct", "unknown")
+        rn_turnover = cms_enriched.get("rn_turnover_pct", "unknown")
+        admin_turnover = cms_enriched.get("admin_turnover_count", "0")
+
+        pain_signals = []
+        if fines and fines != "0": pain_signals.append(f"{fines} CMS fines (${fines_usd})")
+        if penalties and penalties != "0": pain_signals.append(f"{penalties} total penalties")
+        if abuse_flag == "Y": pain_signals.append("abuse flag on record")
+        if inspection_overdue == "Y": pain_signals.append("health inspection overdue >2 years")
+        if nurse_turnover != "unknown" and float(nurse_turnover) > 50: pain_signals.append(f"high nurse turnover ({nurse_turnover}%)")
+        if rn_turnover != "unknown" and float(rn_turnover) > 30: pain_signals.append(f"high RN turnover ({rn_turnover}%)")
+        if admin_turnover and admin_turnover != "0": pain_signals.append(f"{admin_turnover} administrator(s) left")
+
         write_audit_log(
             account_id=state["account_id"],
             agent_run_id=state["agent_run_id"],
             node="web_enricher",
-            action="skipped — data already sufficient or Tavily not configured",
-            rationale="",
-            verified_facts={},
+            action=f"CMS matched — beds={cms_enriched.get('bed_count', 'unknown')}, "
+                   f"rating={cms_enriched.get('cms_overall_rating', '?')}/5, "
+                   f"staffing={cms_enriched.get('cms_staffing_rating', '?')}/5, "
+                   f"ownership={cms_enriched.get('ownership_type', 'unknown')}",
+            rationale=(
+                f"Provider: {cms_enriched.get('cms_provider_name', name)}. "
+                f"Avg residents/day: {cms_enriched.get('avg_residents_per_day', 'unknown')}. "
+                f"Nurse turnover: {nurse_turnover}%, RN turnover: {rn_turnover}%. "
+                f"Pain signals: {', '.join(pain_signals) if pain_signals else 'none detected'}."
+            ),
+            verified_facts={k: v for k, v in cms_enriched.items() if k != "cms_matched"},
             inferred_assumptions={},
         )
+        # If we got bed_count from CMS, no need for Tavily
+        if cms_enriched.get("bed_count"):
+            return {"account_data": account_data}
+
+    # Step 2: Tavily fallback if CMS didn't find bed count
+    if not settings.tavily_api_key or not _needs_enrichment(account_data):
+        if not cms_record:
+            write_audit_log(
+                account_id=state["account_id"],
+                agent_run_id=state["agent_run_id"],
+                node="web_enricher",
+                action="CMS: no match found. Tavily: skipped (not configured or data sufficient)",
+                rationale="",
+                verified_facts={},
+                inferred_assumptions={},
+            )
         return {"account_data": account_data}
 
     email = account_data.get("email", "")
-    name = account_data.get("name", "")
     domain = email.split("@")[-1] if "@" in email else name
-
     query = f'"{domain}" OR "{name}" skilled nursing facility bed count location'
     results = _search_facility(query)
 
@@ -58,14 +233,13 @@ def web_enricher_node(state: AgentState) -> dict:
             account_id=state["account_id"],
             agent_run_id=state["agent_run_id"],
             node="web_enricher",
-            action="searched — no results found",
+            action="CMS: no match. Tavily: searched — no results found",
             rationale=f"Query: {query}",
             verified_facts={},
             inferred_assumptions={},
         )
         return {"account_data": account_data}
 
-    # Ask Claude to extract structured facility data from search snippets
     from ...claude import call_claude
 
     snippets = "\n\n".join(
@@ -78,13 +252,13 @@ def web_enricher_node(state: AgentState) -> dict:
         "input_schema": {
             "type": "object",
             "properties": {
-                "facility_name": {"type": "string", "description": "Official facility name if found"},
-                "bed_count": {"type": "integer", "description": "Number of licensed beds if found"},
-                "location": {"type": "string", "description": "City and state if found"},
-                "facility_type": {"type": "string", "description": "e.g. skilled nursing facility, assisted living"},
-                "parent_organization": {"type": "string", "description": "Parent company or health system if found"},
+                "facility_name": {"type": "string"},
+                "bed_count": {"type": "integer"},
+                "location": {"type": "string"},
+                "facility_type": {"type": "string"},
+                "parent_organization": {"type": "string"},
                 "confidence": {"type": "string", "enum": ["high", "medium", "low"]},
-                "notes": {"type": "string", "description": "Any caveats or uncertainty"},
+                "notes": {"type": "string"},
             },
             "required": ["confidence", "notes"],
         },
@@ -97,46 +271,45 @@ Search query: {query}
 Search results:
 {snippets}
 
-Only extract facts that are clearly stated in the results. Set confidence=low if uncertain.
+Only extract facts clearly stated in the results. Set confidence=low if uncertain.
 Call extract_facility_info."""
 
     msg = call_claude(prompt, tools=[EXTRACT_TOOL])
     tool_use = next((b for b in msg.content if b.type == "tool_use"), None)
 
-    enriched: dict = {}
+    tavily_enriched: dict = {}
     if tool_use:
         extracted = tool_use.input
         if extracted.get("facility_name"):
-            enriched["name"] = extracted["facility_name"]
+            tavily_enriched["name"] = extracted["facility_name"]
         if extracted.get("bed_count"):
-            enriched["bed_count"] = extracted["bed_count"]
+            tavily_enriched["bed_count"] = extracted["bed_count"]
         if extracted.get("location"):
-            enriched["location"] = extracted["location"]
+            tavily_enriched["location"] = extracted["location"]
         if extracted.get("facility_type"):
-            enriched["type"] = extracted["facility_type"]
+            tavily_enriched["type"] = extracted["facility_type"]
         if extracted.get("parent_organization"):
-            enriched["parent_organization"] = extracted["parent_organization"]
+            tavily_enriched["parent_organization"] = extracted["parent_organization"]
 
-        account_data.update(enriched)
+        account_data.update(tavily_enriched)
 
-        # Persist enriched fields back to the accounts table
-        db_update: dict = {}
-        if enriched.get("name"):
-            db_update["name"] = enriched["name"]
-        if enriched.get("bed_count"):
-            db_update["bed_count"] = enriched["bed_count"]
-        if enriched.get("location"):
-            db_update["location"] = enriched["location"]
-        if db_update:
-            update_account(state["account_id"], db_update)
+        db_update2: dict = {}
+        if tavily_enriched.get("bed_count"):
+            db_update2["bed_count"] = tavily_enriched["bed_count"]
+        if tavily_enriched.get("location"):
+            db_update2["location"] = tavily_enriched["location"]
+        if tavily_enriched.get("name"):
+            db_update2["name"] = tavily_enriched["name"]
+        if db_update2:
+            update_account(state["account_id"], db_update2)
 
         write_audit_log(
             account_id=state["account_id"],
             agent_run_id=state["agent_run_id"],
             node="web_enricher",
-            action=f"enriched — found: {list(enriched.keys())} (confidence={extracted.get('confidence')})",
+            action=f"Tavily enriched — found: {list(tavily_enriched.keys())} (confidence={extracted.get('confidence')})",
             rationale=extracted.get("notes", ""),
-            verified_facts=enriched,
+            verified_facts=tavily_enriched,
             inferred_assumptions={},
         )
     else:
@@ -144,7 +317,7 @@ Call extract_facility_info."""
             account_id=state["account_id"],
             agent_run_id=state["agent_run_id"],
             node="web_enricher",
-            action="searched — Claude returned no structured output",
+            action="Tavily searched — Claude returned no structured output",
             rationale=f"Query: {query}",
             verified_facts={},
             inferred_assumptions={},

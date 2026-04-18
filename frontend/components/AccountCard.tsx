@@ -10,6 +10,14 @@ type Account = {
   icp_score: number | null;
   priority_score: number | null;
   status: string;
+  raw_data?: {
+    phone?: string;
+    website?: string;
+    address?: string;
+    category?: string;
+    rating?: number;
+    reviews_count?: number;
+  } | null;
 };
 
 function scoreBadge(score: number | null) {
@@ -31,16 +39,43 @@ function statusColor(status: string) {
 }
 
 export function AccountCard({ account }: { account: Account }) {
+  const raw = account.raw_data;
+  const meta: string[] = [];
+  if (account.bed_count) meta.push(`${account.bed_count} beds`);
+  if (account.location) meta.push(account.location);
+  if (raw?.category && raw.category !== "Skilled nursing care facility") meta.push(raw.category);
+
   return (
     <Link href={`/accounts/${account.id}`}>
-      <div className="flex items-center gap-4 p-4 bg-white rounded-lg border hover:border-gray-300 transition-colors cursor-pointer">
+      <div className="flex items-start gap-4 p-4 bg-white rounded-lg border hover:border-gray-300 transition-colors cursor-pointer">
         <div className="flex-1 min-w-0">
-          <p className="font-medium text-gray-900 truncate">{account.name}</p>
-          <p className="text-sm text-gray-500">
-            {account.bed_count ? `${account.bed_count} beds` : "—"} · {account.location ?? "—"}
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="font-medium text-gray-900 truncate">{account.name}</p>
+            {raw?.rating && (
+              <span className="text-xs text-gray-400">★ {raw.rating}{raw.reviews_count ? ` (${raw.reviews_count})` : ""}</span>
+            )}
+          </div>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {meta.length > 0 ? meta.join(" · ") : "—"}
           </p>
+          <div className="flex gap-3 mt-1 flex-wrap">
+            {raw?.address && (
+              <span className="text-xs text-gray-400">{raw.address}</span>
+            )}
+            {raw?.phone && (
+              <span className="text-xs text-gray-400">{raw.phone}</span>
+            )}
+            {raw?.website && (
+              <span
+                className="text-xs text-blue-400 truncate max-w-xs"
+                onClick={e => { e.preventDefault(); window.open(raw.website, "_blank"); }}
+              >
+                {raw.website.replace(/^https?:\/\//, "").replace(/\/$/, "")}
+              </span>
+            )}
+          </div>
         </div>
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex items-center gap-3 shrink-0 mt-0.5">
           <div className="text-right">
             <p className="text-xs text-gray-400">ICP</p>
             {scoreBadge(account.icp_score)}

@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     gmail_token: str = ""
     gmail_sender_email: str = ""
     tavily_api_key: str = ""
+    apify_api_key: str = ""
 
     model_config = {"env_file": ".env"}
 

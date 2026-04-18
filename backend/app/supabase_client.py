@@ -36,8 +36,19 @@ def update_account(account_id: str, updates: dict) -> None:
 
 
 def upsert_contacts(contacts: list[dict]) -> None:
-    if contacts:
-        get_supabase().table("contacts").upsert(contacts, on_conflict="account_id,email").execute()
+    if not contacts:
+        return
+    for contact in contacts:
+        try:
+            get_supabase().table("contacts").insert(contact).execute()
+        except Exception:
+            # If contact already exists, update it
+            try:
+                get_supabase().table("contacts").update(contact).eq(
+                    "account_id", contact["account_id"]
+                ).eq("email", contact.get("email", "")).execute()
+            except Exception:
+                pass
 
 
 def create_outreach_action(data: dict) -> dict:

@@ -33,6 +33,53 @@ type EmailEntry = {
   bed_count?: number;
 };
 
+export async function searchSnfs(params: {
+  query: string;
+  state: string;
+  city?: string;
+  max_results?: number;
+}) {
+  const qs = new URLSearchParams({
+    query: params.query,
+    state: params.state,
+    ...(params.city ? { city: params.city } : {}),
+    ...(params.max_results ? { max_results: String(params.max_results) } : {}),
+  });
+  const res = await fetch(`${API}/accounts/search?${qs}`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export type FacilityResult = {
+  name: string;
+  address: string;
+  city: string;
+  state: string;
+  phone: string;
+  website: string;
+  rating: number | null;
+  reviews_count: number;
+  place_id: string;
+  maps_url: string;
+  category: string;
+};
+
+export async function enrichAccount(id: string) {
+  const res = await fetch(`${API}/accounts/${id}/enrich`, { method: "POST" });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function bulkImport(facilities: FacilityResult[]) {
+  const res = await fetch(`${API}/accounts/bulk-import`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ facilities }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 export async function pasteAccounts(emails: EmailEntry[]) {
   const res = await fetch(`${API}/accounts/add-emails`, {
     method: "POST",

@@ -38,6 +38,20 @@ def build_outreach_graph(checkpointer):
     )
 
 
+def build_enrich_graph(checkpointer):
+    """Lightweight graph for re-enrichment: only CMS lookup + re-scoring. No outreach."""
+    g = StateGraph(AgentState)
+
+    g.add_node("web_enricher", web_enricher_node)
+    g.add_node("account_selector", account_selector_node)
+
+    g.set_entry_point("web_enricher")
+    g.add_edge("web_enricher", "account_selector")
+    g.add_edge("account_selector", END)
+
+    return g.compile(checkpointer=checkpointer)
+
+
 def build_reply_graph(checkpointer):
     g = StateGraph(AgentState)
 
