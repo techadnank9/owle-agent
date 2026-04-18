@@ -137,10 +137,21 @@ def _parse_cms_record(record: dict) -> dict:
     return enriched
 
 
+SKIP_DOMAINS = {"medicare.gov", "cms.gov", "google.com", "yelp.com", "facebook.com", "healthgrades.com"}
+
+
 def _fetch_website_contacts(website_url: str) -> dict:
     """Scrape contact email/phone from facility website using Apify website-content-crawler."""
     if not settings.apify_api_key or not website_url:
         return {}
+    # Skip non-facility URLs (government directories, review sites)
+    from urllib.parse import urlparse
+    try:
+        domain = urlparse(website_url).netloc.lower().replace("www.", "")
+        if any(skip in domain for skip in SKIP_DOMAINS):
+            return {}
+    except Exception:
+        pass
     try:
         from apify_client import ApifyClient
         import re
@@ -208,26 +219,35 @@ def _fetch_linkedin_profiles(facility_name: str, location: str) -> tuple[list[di
             except Exception:
                 pass
 
-        # Enrich profiles with dev_fusion for verified emails
+        # Try supreme_coder/linkedin-profile-scraper (no cookies, works on free plan)
         if linkedin_urls:
             try:
-                run2 = client.actor("2SyF0bVxmgGr8IVCZ").call(
+                run2 = client.actor("supreme_coder~linkedin-profile-scraper").call(
                     run_input={"profileUrls": linkedin_urls[:4]},
                     timeout_secs=120,
                 )
                 for item in client.dataset(run2["defaultDatasetId"]).iterate_items():
-                    if item.get("succeeded") is not False:
-                        profiles.append({
-                            "full_name": item.get("fullName", ""),
-                            "headline": item.get("headline", ""),
-                            "job_title": item.get("jobTitle", ""),
-                            "company": item.get("companyName", ""),
-                            "email": item.get("email", ""),
-                            "linkedin_url": item.get("linkedinUrl", ""),
-                            "location": item.get("geoLocationName", ""),
-                        })
+                    profiles.append({
+                        "full_name": item.get("fullName", "") or item.get("name", ""),
+                        "headline": item.get("headline", ""),
+                        "job_title": item.get("jobTitle", "") or item.get("title", ""),
+                        "company": item.get("companyName", "") or item.get("company", ""),
+                        "email": item.get("email", ""),
+                        "linkedin_url": item.get("linkedinUrl", "") or item.get("profileUrl", ""),
+                        "location": item.get("geoLocationName", "") or item.get("location", ""),
+                    })
             except Exception:
-                pass
+                # If enrichment fails, store profiles from search without email
+                for url in linkedin_urls[:4]:
+                    profiles.append({
+                        "full_name": "",
+                        "headline": "",
+                        "job_title": "",
+                        "company": facility_name,
+                        "email": "",
+                        "linkedin_url": url,
+                        "location": location,
+                    })
 
         return profiles, company_url
     except Exception:
