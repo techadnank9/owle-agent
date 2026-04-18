@@ -92,6 +92,24 @@ cd backend
 pytest tests/ -v
 ```
 
+### 5. Frontend
+
+```bash
+cd frontend
+cp .env.local.example .env.local  # fill in Supabase URL + key
+npm install
+npm run dev
+```
+
+Open `http://localhost:3000`
+
+| Page | Path | What it does |
+|---|---|---|
+| Accounts | `/accounts` | Upload CSV, view scored accounts |
+| Queue | `/queue` | Approve/reject/send outreach drafts |
+| Inbox | `/inbox` | View classified replies + response drafts |
+| Detail | `/accounts/:id` | Account scores + full audit log |
+
 ## Agent Nodes
 
 | Node | What it does |
@@ -118,7 +136,7 @@ POST /webhooks/gmail
 
 ## Implementation Plans
 
-- **Plan 1** (current): Foundation — scaffold, schema, LangGraph skeleton ✅
-- **Plan 2**: Agent pipeline — real Claude calls in all nodes
-- **Plan 3**: Gmail integration — send + reply webhook
-- **Plan 4**: Frontend dashboard — Next.js, HITL approval UI, inbox
+- **Plan 1**: Foundation — scaffold, schema, LangGraph skeleton ✅
+- **Plan 2**: Agent pipeline — real Claude calls in all nodes ✅
+- **Plan 3**: Gmail integration — send + reply webhook ✅
+- **Plan 4**: Frontend dashboard — Next.js, HITL approval UI, inbox ✅
