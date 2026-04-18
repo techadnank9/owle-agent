@@ -1,8 +1,8 @@
 services:
   - type: web
     name: owle-agent-api
-    runtime: python
-    buildCommand: pip install -e ".[dev]"
+    runtime: python-3.11
+    buildCommand: pip install .
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: ANTHROPIC_API_KEY
