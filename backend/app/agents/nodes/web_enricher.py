@@ -323,8 +323,14 @@ def web_enricher_node(state: AgentState) -> dict:
                 inferred_assumptions={},
             )
 
-    # Persist all enrichment back to raw_data
-    update_account(state["account_id"], {"raw_data": account_data})
+    # Persist enrichment — only store compact fields, not full crawled text
+    compact = {k: v for k, v in account_data.items()
+               if k not in ("text", "markdown", "html", "content")
+               and not isinstance(v, str) or (isinstance(v, str) and len(v) < 500)}
+    try:
+        update_account(state["account_id"], {"raw_data": compact})
+    except Exception:
+        pass
 
     if cms_enriched.get("bed_count"):
         return {"account_data": account_data}

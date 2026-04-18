@@ -165,6 +165,7 @@ export default function AccountDetailPage({ params }: { params: Promise<{ id: st
     if (raw.address) facilityRows.push({ label: "Address", value: raw.address });
     if (raw.phone) facilityRows.push({ label: "Phone", value: raw.phone });
     if (raw.website) facilityRows.push({ label: "Website", value: (raw.website).replace(/^https?:\/\//, "").replace(/\/$/, ""), link: raw.website });
+    if (raw.linkedin_company_url) facilityRows.push({ label: "LinkedIn", value: "View Company →", link: raw.linkedin_company_url });
     if (raw.category) facilityRows.push({ label: "Category", value: raw.category });
     if (raw.rating) facilityRows.push({ label: "Google Rating", value: `★ ${raw.rating}${raw.reviews_count ? ` (${raw.reviews_count})` : ""}` });
     if (raw.email) facilityRows.push({ label: "Email", value: raw.email });
@@ -177,7 +178,7 @@ export default function AccountDetailPage({ params }: { params: Promise<{ id: st
     if (raw.parent_organization) facilityRows.push({ label: "Parent Org", value: raw.parent_organization });
     if (raw.contact_email) facilityRows.push({ label: "Contact Email", value: raw.contact_email });
     if (raw.contact_phone) facilityRows.push({ label: "Contact Phone", value: raw.contact_phone });
-    if (raw.linkedin_company_url) facilityRows.push({ label: "Company LinkedIn", value: raw.linkedin_company_url, link: raw.linkedin_company_url });
+
   }
 
   // LinkedIn profiles from web_enricher

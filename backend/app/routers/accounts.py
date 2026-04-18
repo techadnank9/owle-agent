@@ -52,9 +52,15 @@ def _run_enrich_for_account(checkpointer, account_id: str, agent_run_id: str, ac
     config = {"configurable": {"thread_id": thread_id}}
     try:
         graph.invoke(initial_state, config)
-        supabase.table("agent_runs").update({"status": "completed", "current_node": "account_selector"}).eq("id", agent_run_id).execute()
+        try:
+            supabase.table("agent_runs").update({"status": "completed", "current_node": "account_selector"}).eq("id", agent_run_id).execute()
+        except Exception:
+            pass
     except Exception as e:
-        supabase.table("agent_runs").update({"status": "failed"}).eq("id", agent_run_id).execute()
+        try:
+            supabase.table("agent_runs").update({"status": "failed"}).eq("id", agent_run_id).execute()
+        except Exception:
+            pass
         print(f"[enrich] failed for account {account_id}: {e}")
 
 
@@ -294,12 +300,18 @@ def _run_agent_for_account(checkpointer, account_id: str, agent_run_id: str, acc
     config = {"configurable": {"thread_id": thread_id}}
     try:
         graph.invoke(initial_state, config)
-        supabase.table("agent_runs").update({
-            "status": "waiting_hitl",
-            "current_node": "outreach_generator",
-        }).eq("id", agent_run_id).execute()
+        try:
+            supabase.table("agent_runs").update({
+                "status": "waiting_hitl",
+                "current_node": "outreach_generator",
+            }).eq("id", agent_run_id).execute()
+        except Exception:
+            pass
     except Exception as e:
-        supabase.table("agent_runs").update({"status": "failed"}).eq("id", agent_run_id).execute()
+        try:
+            supabase.table("agent_runs").update({"status": "failed"}).eq("id", agent_run_id).execute()
+        except Exception:
+            pass
         print(f"[bulk-import] agent failed for account {account_id}: {e}")
 
 
