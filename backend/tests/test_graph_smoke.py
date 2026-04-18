@@ -24,6 +24,7 @@ def test_graph_runs_through_outreach_generator():
     graph = build_graph(MemorySaver())
     initial_state = {
         "account_id": "test-account-001",
+        "agent_run_id": "test-run-001",
         "account_data": {
             "name": "Sunrise Skilled Nursing",
             "bed_count": 120,
