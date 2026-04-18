@@ -219,11 +219,15 @@ def _fetch_linkedin_profiles(facility_name: str, location: str) -> tuple[list[di
             except Exception:
                 pass
 
-        # Try supreme_coder/linkedin-profile-scraper (no cookies, works on free plan)
+        # Primary: harvestapi/linkedin-profile-scraper (free plan compatible, 4.71★, 16k users)
         if linkedin_urls:
+            enriched = False
             try:
-                run2 = client.actor("supreme_coder~linkedin-profile-scraper").call(
-                    run_input={"profileUrls": linkedin_urls[:4]},
+                run2 = client.actor("harvestapi~linkedin-profile-scraper").call(
+                    run_input={
+                        "queries": linkedin_urls[:4],
+                        "profileScraperMode": "Profile details + email search ($10 per 1k)",
+                    },
                     timeout_secs=120,
                 )
                 for item in client.dataset(run2["defaultDatasetId"]).iterate_items():
@@ -236,17 +240,39 @@ def _fetch_linkedin_profiles(facility_name: str, location: str) -> tuple[list[di
                         "linkedin_url": item.get("linkedinUrl", "") or item.get("profileUrl", ""),
                         "location": item.get("geoLocationName", "") or item.get("location", ""),
                     })
+                enriched = True
             except Exception:
-                # If enrichment fails, store profiles from search without email
+                pass
+
+            # Backup: dev_fusion/Linkedin-Profile-Scraper (paid plan only, 4.35★, 51k users)
+            if not enriched:
+                try:
+                    run2 = client.actor("2SyF0bVxmgGr8IVCZ").call(
+                        run_input={"profileUrls": linkedin_urls[:4]},
+                        timeout_secs=120,
+                    )
+                    for item in client.dataset(run2["defaultDatasetId"]).iterate_items():
+                        if item.get("succeeded") is not False:
+                            profiles.append({
+                                "full_name": item.get("fullName", ""),
+                                "headline": item.get("headline", ""),
+                                "job_title": item.get("jobTitle", ""),
+                                "company": item.get("companyName", ""),
+                                "email": item.get("email", ""),
+                                "linkedin_url": item.get("linkedinUrl", ""),
+                                "location": item.get("geoLocationName", ""),
+                            })
+                    enriched = True
+                except Exception:
+                    pass
+
+            # Final fallback: store just URLs without email enrichment
+            if not enriched:
                 for url in linkedin_urls[:4]:
                     profiles.append({
-                        "full_name": "",
-                        "headline": "",
-                        "job_title": "",
-                        "company": facility_name,
-                        "email": "",
-                        "linkedin_url": url,
-                        "location": location,
+                        "full_name": "", "headline": "", "job_title": "",
+                        "company": facility_name, "email": "",
+                        "linkedin_url": url, "location": location,
                     })
 
         return profiles, company_url
