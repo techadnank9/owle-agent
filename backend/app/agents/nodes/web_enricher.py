@@ -254,11 +254,11 @@ def _fetch_linkedin_profiles(facility_name: str, location: str, company_linkedin
                         if url and "linkedin.com/in/" in url:
                             clean = url.split("?")[0]
                             if clean not in linkedin_urls:
-                            linkedin_urls.append(clean)
-                    if not company_url:
-                        company_url = item.get("companyLinkedinUrl", "")
-            except Exception:
-                pass
+                                linkedin_urls.append(clean)
+                        if not company_url:
+                            company_url = item.get("companyLinkedinUrl", "")
+                except Exception:
+                    pass
 
         # Primary: harvestapi/linkedin-profile-scraper (free plan compatible, 4.71★, 16k users)
         if linkedin_urls:
