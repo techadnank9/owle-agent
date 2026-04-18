@@ -177,14 +177,18 @@ def _fetch_website_contacts(website_url: str) -> dict:
         return {}
 
 
-def _fetch_linkedin_profiles(facility_name: str, location: str) -> list[dict]:
-    """Find decision-maker LinkedIn profiles via Tavily + dev_fusion scraper."""
+def _fetch_linkedin_profiles(facility_name: str, location: str) -> tuple[list[dict], str]:
+    """Find decision-maker LinkedIn profiles via Tavily + dev_fusion scraper.
+    Returns (profiles, company_linkedin_url)."""
     if not settings.apify_api_key or not settings.tavily_api_key:
-        return []
+        return [], ""
     try:
         from tavily import TavilyClient
         tv = TavilyClient(api_key=settings.tavily_api_key)
         linkedin_urls: list[str] = []
+        company_url = ""
+
+        # Search for employee profiles (Administrator, DON)
         for title in ["Administrator", "Director of Nursing"]:
             query = f'site:linkedin.com/in "{title}" "{facility_name}" {location}'
             resp = tv.search(query=query, search_depth="basic", max_results=3)
@@ -194,8 +198,21 @@ def _fetch_linkedin_profiles(facility_name: str, location: str) -> list[dict]:
                     clean = url.split("?")[0]
                     if clean not in linkedin_urls:
                         linkedin_urls.append(clean)
+
+        # Search for company LinkedIn page
+        comp_resp = tv.search(
+            query=f'site:linkedin.com/company "{facility_name}"',
+            search_depth="basic", max_results=2
+        )
+        for r in comp_resp.get("results", []):
+            url = r.get("url", "")
+            if "linkedin.com/company/" in url:
+                company_url = url.split("?")[0]
+                break
+
         if not linkedin_urls:
-            return []
+            return [], company_url
+
         from apify_client import ApifyClient
         client = ApifyClient(settings.apify_api_key)
         run = client.actor("2SyF0bVxmgGr8IVCZ").call(
@@ -214,9 +231,9 @@ def _fetch_linkedin_profiles(facility_name: str, location: str) -> list[dict]:
                     "linkedin_url": item.get("linkedinUrl", ""),
                     "location": item.get("geoLocationName", ""),
                 })
-        return profiles
+        return profiles, company_url
     except Exception:
-        return []
+        return [], ""
 
 
 def _search_facility(query: str) -> list[dict]:
@@ -307,26 +324,41 @@ def web_enricher_node(state: AgentState) -> dict:
                 inferred_assumptions={},
             )
 
-    # Step 3: LinkedIn decision-maker profiles — runs always when Tavily configured
+    # Step 3: LinkedIn decision-maker profiles + company page
     loc = account_data.get("location", "")
     if settings.tavily_api_key and settings.apify_api_key and not account_data.get("linkedin_profiles"):
-        linkedin_profiles = _fetch_linkedin_profiles(name, loc)
+        linkedin_profiles, company_linkedin = _fetch_linkedin_profiles(name, loc)
+        if company_linkedin and not account_data.get("linkedin_company_url"):
+            account_data["linkedin_company_url"] = company_linkedin
         if linkedin_profiles:
             account_data["linkedin_profiles"] = linkedin_profiles
+            # Extract emails from profiles and store top one
+            profile_emails = [p["email"] for p in linkedin_profiles if p.get("email")]
+            if profile_emails and not account_data.get("contact_email"):
+                account_data["contact_email"] = profile_emails[0]
             write_audit_log(
                 account_id=state["account_id"],
                 agent_run_id=state["agent_run_id"],
                 node="web_enricher",
-                action=f"LinkedIn profiles found — {len(linkedin_profiles)} decision-maker(s)",
+                action=f"LinkedIn profiles found — {len(linkedin_profiles)} decision-maker(s)"
+                       + (f", company page found" if company_linkedin else "")
+                       + (f", {len(profile_emails)} email(s) extracted" if profile_emails else ""),
                 rationale=f"Searched LinkedIn for {name} staff in {loc}.",
-                verified_facts={"profiles_count": len(linkedin_profiles)},
+                verified_facts={"profiles_count": len(linkedin_profiles),
+                                "company_linkedin": company_linkedin,
+                                "emails_found": profile_emails[:3]},
                 inferred_assumptions={},
             )
 
-    # Persist enrichment — only store compact fields, not full crawled text
-    compact = {k: v for k, v in account_data.items()
-               if k not in ("text", "markdown", "html", "content")
-               and not isinstance(v, str) or (isinstance(v, str) and len(v) < 500)}
+    # Persist enrichment — strip large text blobs, keep structured fields
+    SKIP_KEYS = {"text", "markdown", "html", "content", "body"}
+    compact = {}
+    for k, v in account_data.items():
+        if k in SKIP_KEYS:
+            continue
+        if isinstance(v, str) and len(v) > 500:
+            continue
+        compact[k] = v
     try:
         update_account(state["account_id"], {"raw_data": compact})
     except Exception:
