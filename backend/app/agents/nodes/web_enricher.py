@@ -280,33 +280,56 @@ def web_enricher_node(state: AgentState) -> dict:
             verified_facts={k: v for k, v in cms_enriched.items() if k != "cms_matched"},
             inferred_assumptions={},
         )
-        # Step 1b: Scrape facility website for contact email
-        website = account_data.get("website", "")
-        if website and settings.apify_api_key:
-            contact_info = _fetch_website_contacts(website)
-            if contact_info:
-                account_data.update(contact_info)
-                update_account(state["account_id"], {"raw_data": account_data})
+        # If we got bed_count from CMS, no need for Tavily
+        if cms_enriched.get("bed_count"):
+            pass  # continue to contact enrichment below
 
-        # Step 1c: Find LinkedIn decision-maker profiles
-        loc = account_data.get("location", "")
+    # Step 2: Apify website contact scraper — runs always when website URL exists
+    website = account_data.get("website", "")
+    if website and settings.apify_api_key and not account_data.get("contact_email"):
+        contact_info = _fetch_website_contacts(website)
+        if contact_info:
+            account_data.update(contact_info)
+            write_audit_log(
+                account_id=state["account_id"],
+                agent_run_id=state["agent_run_id"],
+                node="web_enricher",
+                action=f"Website scraped — found: {', '.join(k for k in contact_info if contact_info[k])}",
+                rationale=f"Scraped {website} for contact details.",
+                verified_facts=contact_info,
+                inferred_assumptions={},
+            )
+
+    # Step 3: LinkedIn decision-maker profiles — runs always when Tavily configured
+    loc = account_data.get("location", "")
+    if settings.tavily_api_key and settings.apify_api_key and not account_data.get("linkedin_profiles"):
         linkedin_profiles = _fetch_linkedin_profiles(name, loc)
         if linkedin_profiles:
             account_data["linkedin_profiles"] = linkedin_profiles
-            update_account(state["account_id"], {"raw_data": account_data})
+            write_audit_log(
+                account_id=state["account_id"],
+                agent_run_id=state["agent_run_id"],
+                node="web_enricher",
+                action=f"LinkedIn profiles found — {len(linkedin_profiles)} decision-maker(s)",
+                rationale=f"Searched LinkedIn for {name} staff in {loc}.",
+                verified_facts={"profiles_count": len(linkedin_profiles)},
+                inferred_assumptions={},
+            )
 
-        # If we got bed_count from CMS, no need for Tavily
-        if cms_enriched.get("bed_count"):
-            return {"account_data": account_data}
+    # Persist all enrichment back to raw_data
+    update_account(state["account_id"], {"raw_data": account_data})
 
-    # Step 2: Tavily fallback if CMS didn't find bed count
+    if cms_enriched.get("bed_count"):
+        return {"account_data": account_data}
+
+    # Step 4: Tavily fallback if CMS didn't find bed count
     if not settings.tavily_api_key or not _needs_enrichment(account_data):
         if not cms_record:
             write_audit_log(
                 account_id=state["account_id"],
                 agent_run_id=state["agent_run_id"],
                 node="web_enricher",
-                action="CMS: no match found. Tavily: skipped (not configured or data sufficient)",
+                action="CMS: no match. Tavily: skipped (not configured or data sufficient)",
                 rationale="",
                 verified_facts={},
                 inferred_assumptions={},
