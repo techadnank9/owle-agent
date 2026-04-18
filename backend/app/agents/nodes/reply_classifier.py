@@ -96,5 +96,6 @@ Call classify_reply."""
         "reply_classification": classification,
         "reply_confidence": confidence,
         "response_draft": response_draft,
+        "escalate_to_human": escalate,
         "audit_entries": state.get("audit_entries", []) + [entry],
     }

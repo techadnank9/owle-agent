@@ -37,7 +37,7 @@ def update_account(account_id: str, updates: dict) -> None:
 
 def upsert_contacts(contacts: list[dict]) -> None:
     if contacts:
-        get_supabase().table("contacts").insert(contacts).execute()
+        get_supabase().table("contacts").upsert(contacts, on_conflict="account_id,email").execute()
 
 
 def create_outreach_action(data: dict) -> dict:
