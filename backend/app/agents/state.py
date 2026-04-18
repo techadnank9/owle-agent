@@ -2,8 +2,9 @@ from typing import TypedDict
 
 
 class AgentState(TypedDict):
-    # Input
+    # Metadata
     account_id: str
+    agent_run_id: str
     account_data: dict
 
     # account_selector output
@@ -32,6 +33,7 @@ class AgentState(TypedDict):
     reply_classification: str | None
     reply_confidence: float | None
     response_draft: str | None
+    escalate_to_human: bool
 
     # meeting_booker output
     meeting_status: str | None
