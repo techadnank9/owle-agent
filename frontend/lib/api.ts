@@ -25,3 +25,20 @@ export async function sendOutreach(id: string) {
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
+
+type EmailEntry = {
+  email: string;
+  name?: string;
+  location?: string;
+  bed_count?: number;
+};
+
+export async function pasteAccounts(emails: EmailEntry[]) {
+  const res = await fetch(`${API}/accounts/add-emails`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ emails }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}

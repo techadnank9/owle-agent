@@ -17,6 +17,7 @@ dependencies = [
     "google-api-python-client>=2.128.0",
     "apscheduler>=3.10.0",
     "python-multipart>=0.0.9",
+    "tavily-python>=0.3.0",
 ]
 
 [project.optional-dependencies]

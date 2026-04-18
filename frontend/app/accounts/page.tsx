@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { AccountCard } from "@/components/AccountCard";
 import { UploadButton } from "@/components/UploadButton";
+import { PasteEmailsDialog } from "@/components/PasteEmailsDialog";
 
 type Account = {
   id: string;
@@ -45,7 +46,10 @@ export default function AccountsPage() {
           <h1 className="text-xl font-semibold text-gray-900">Accounts</h1>
           <p className="text-sm text-gray-500">{accounts.length} total</p>
         </div>
-        <UploadButton onDone={load} />
+        <div className="flex items-center gap-2">
+          <PasteEmailsDialog onDone={load} />
+          <UploadButton onDone={load} />
+        </div>
       </div>
 
       {loading ? (
