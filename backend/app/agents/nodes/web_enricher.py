@@ -206,11 +206,15 @@ def _fetch_linkedin_profiles(facility_name: str, location: str) -> tuple[list[di
         for title in ["Administrator", "Director of Nursing"]:
             try:
                 run = client.actor("harvestapi~linkedin-profile-search").call(
-                    run_input={"queries": [f"{title} {facility_name}"], "maxResults": 3},
+                    run_input={
+                        "searchQuery": f"{title} {facility_name}",
+                        "currentJobTitles": [title],
+                        "maxItems": 3,
+                    },
                     timeout_secs=60,
                 )
                 for item in client.dataset(run["defaultDatasetId"]).iterate_items():
-                    url = item.get("profileUrl") or item.get("linkedinUrl", "")
+                    url = item.get("profileUrl") or item.get("linkedinUrl") or item.get("url", "")
                     if url and "linkedin.com/in/" in url:
                         clean = url.split("?")[0]
                         if clean not in linkedin_urls:
