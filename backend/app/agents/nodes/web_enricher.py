@@ -410,7 +410,7 @@ def web_enricher_node(state: AgentState) -> dict:
     # Step 3: LinkedIn decision-maker profiles + company page (no Tavily needed)
     loc = account_data.get("location", "")
     existing_company_url = account_data.get("linkedin_company_url", "")
-    if settings.apify_api_key and not account_data.get("linkedin_profiles"):
+    if settings.apify_api_key:
         linkedin_profiles, company_linkedin = _fetch_linkedin_profiles(name, loc, existing_company_url)
         if company_linkedin and not account_data.get("linkedin_company_url"):
             account_data["linkedin_company_url"] = company_linkedin
@@ -434,19 +434,21 @@ def web_enricher_node(state: AgentState) -> dict:
                 inferred_assumptions={},
             )
 
-    # Persist enrichment — strip large text blobs, keep structured fields
+    # Persist enrichment — strip large text blobs only, keep all structured fields
     SKIP_KEYS = {"text", "markdown", "html", "content", "body"}
     compact = {}
     for k, v in account_data.items():
         if k in SKIP_KEYS:
             continue
+        # Skip only long strings — keep lists, dicts, numbers, booleans
         if isinstance(v, str) and len(v) > 500:
             continue
         compact[k] = v
     try:
         update_account(state["account_id"], {"raw_data": compact})
-    except Exception:
-        pass
+        print(f"[web_enricher] saved raw_data keys: {list(compact.keys())}")
+    except Exception as e:
+        print(f"[web_enricher] failed to save raw_data: {e}")
 
     if cms_enriched.get("bed_count"):
         return {"account_data": account_data}
