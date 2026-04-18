@@ -162,8 +162,9 @@ def _fetch_website_contacts(website_url: str) -> dict:
                 "startUrls": [{"url": website_url}],
                 "maxCrawlPages": 5,
                 "maxCrawlDepth": 1,
-                "crawlerType": "playwright:firefox",  # handles JS-rendered content
+                "crawlerType": "playwright:firefox",
                 "dynamicContentWaitSecs": 3,
+                "proxyConfiguration": {"useApifyProxy": True},
             },
             timeout_secs=180,
         )
