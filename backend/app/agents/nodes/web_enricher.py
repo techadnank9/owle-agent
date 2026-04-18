@@ -178,64 +178,60 @@ def _fetch_website_contacts(website_url: str) -> dict:
 
 
 def _fetch_linkedin_profiles(facility_name: str, location: str) -> tuple[list[dict], str]:
-    """Find decision-maker LinkedIn profiles via Tavily + dev_fusion scraper.
-    Returns (profiles, company_linkedin_url)."""
-    if not settings.apify_api_key or not settings.tavily_api_key:
+    """Find decision-maker LinkedIn profiles using harvestapi/linkedin-profile-search
+    (no Tavily, no cookies). Returns (profiles, company_linkedin_url)."""
+    if not settings.apify_api_key:
         return [], ""
     try:
-        from tavily import TavilyClient
-        tv = TavilyClient(api_key=settings.tavily_api_key)
-        linkedin_urls: list[str] = []
-        company_url = ""
-
-        # Search for employee profiles (Administrator, DON)
-        for title in ["Administrator", "Director of Nursing"]:
-            query = f'site:linkedin.com/in "{title}" "{facility_name}" {location}'
-            resp = tv.search(query=query, search_depth="basic", max_results=3)
-            for r in resp.get("results", []):
-                url = r.get("url", "")
-                if "linkedin.com/in/" in url:
-                    clean = url.split("?")[0]
-                    if clean not in linkedin_urls:
-                        linkedin_urls.append(clean)
-
-        # Search for company LinkedIn page
-        comp_resp = tv.search(
-            query=f'site:linkedin.com/company "{facility_name}"',
-            search_depth="basic", max_results=2
-        )
-        for r in comp_resp.get("results", []):
-            url = r.get("url", "")
-            if "linkedin.com/company/" in url:
-                company_url = url.split("?")[0]
-                break
-
-        if not linkedin_urls:
-            return [], company_url
-
         from apify_client import ApifyClient
         client = ApifyClient(settings.apify_api_key)
-        run = client.actor("2SyF0bVxmgGr8IVCZ").call(
-            run_input={"profileUrls": linkedin_urls[:4]},
-            timeout_secs=120,
-        )
+
         profiles = []
-        for item in client.dataset(run["defaultDatasetId"]).iterate_items():
-            if item.get("succeeded") is not False:
-                profiles.append({
-                    "full_name": item.get("fullName", ""),
-                    "headline": item.get("headline", ""),
-                    "job_title": item.get("jobTitle", ""),
-                    "company": item.get("companyName", ""),
-                    "email": item.get("email", ""),
-                    "linkedin_url": item.get("linkedinUrl", ""),
-                    "location": item.get("geoLocationName", ""),
-                })
+        company_url = ""
+        linkedin_urls: list[str] = []
+
+        # Search LinkedIn for Administrators and DONs at this facility
+        for title in ["Administrator", "Director of Nursing"]:
+            try:
+                run = client.actor("harvestapi~linkedin-profile-search").call(
+                    run_input={"queries": [f"{title} {facility_name}"], "maxResults": 3},
+                    timeout_secs=60,
+                )
+                for item in client.dataset(run["defaultDatasetId"]).iterate_items():
+                    url = item.get("profileUrl") or item.get("linkedinUrl", "")
+                    if url and "linkedin.com/in/" in url:
+                        clean = url.split("?")[0]
+                        if clean not in linkedin_urls:
+                            linkedin_urls.append(clean)
+                    if not company_url:
+                        company_url = item.get("companyLinkedinUrl", "")
+            except Exception:
+                pass
+
+        # Enrich profiles with dev_fusion for verified emails
+        if linkedin_urls:
+            try:
+                run2 = client.actor("2SyF0bVxmgGr8IVCZ").call(
+                    run_input={"profileUrls": linkedin_urls[:4]},
+                    timeout_secs=120,
+                )
+                for item in client.dataset(run2["defaultDatasetId"]).iterate_items():
+                    if item.get("succeeded") is not False:
+                        profiles.append({
+                            "full_name": item.get("fullName", ""),
+                            "headline": item.get("headline", ""),
+                            "job_title": item.get("jobTitle", ""),
+                            "company": item.get("companyName", ""),
+                            "email": item.get("email", ""),
+                            "linkedin_url": item.get("linkedinUrl", ""),
+                            "location": item.get("geoLocationName", ""),
+                        })
+            except Exception:
+                pass
+
         return profiles, company_url
     except Exception:
         return [], ""
-
-
 def _search_facility(query: str) -> list[dict]:
     try:
         from tavily import TavilyClient
@@ -324,9 +320,9 @@ def web_enricher_node(state: AgentState) -> dict:
                 inferred_assumptions={},
             )
 
-    # Step 3: LinkedIn decision-maker profiles + company page
+    # Step 3: LinkedIn decision-maker profiles + company page (no Tavily needed)
     loc = account_data.get("location", "")
-    if settings.tavily_api_key and settings.apify_api_key and not account_data.get("linkedin_profiles"):
+    if settings.apify_api_key and not account_data.get("linkedin_profiles"):
         linkedin_profiles, company_linkedin = _fetch_linkedin_profiles(name, loc)
         if company_linkedin and not account_data.get("linkedin_company_url"):
             account_data["linkedin_company_url"] = company_linkedin
