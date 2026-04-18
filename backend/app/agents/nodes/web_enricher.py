@@ -137,6 +137,81 @@ def _parse_cms_record(record: dict) -> dict:
     return enriched
 
 
+def _fetch_website_contacts(website_url: str) -> dict:
+    """Scrape contact email/phone/LinkedIn from facility website via Apify."""
+    if not settings.apify_api_key or not website_url:
+        return {}
+    try:
+        from apify_client import ApifyClient
+        client = ApifyClient(settings.apify_api_key)
+        run = client.actor("lukaskrivka~google-maps-with-contact-details").call(
+            run_input={"startUrls": [{"url": website_url}], "maxDepth": 1, "maxPagesPerDomain": 5},
+            timeout_secs=90,
+        )
+        items = list(client.dataset(run["defaultDatasetId"]).iterate_items())
+        if not items:
+            return {}
+        item = items[0]
+        result: dict = {}
+        emails = item.get("emails", [])
+        if emails:
+            first = emails[0]
+            result["contact_email"] = first if isinstance(first, str) else first.get("email", "")
+            result["all_emails"] = [e if isinstance(e, str) else e.get("email", "") for e in emails[:5]]
+        phones = item.get("phones", [])
+        if phones:
+            first_p = phones[0]
+            result["contact_phone"] = first_p if isinstance(first_p, str) else first_p.get("phone", "")
+        social = item.get("linkedIns", [])
+        if social:
+            result["linkedin_company_url"] = social[0]
+        return result
+    except Exception:
+        return {}
+
+
+def _fetch_linkedin_profiles(facility_name: str, location: str) -> list[dict]:
+    """Find decision-maker LinkedIn profiles via Tavily + dev_fusion scraper."""
+    if not settings.apify_api_key or not settings.tavily_api_key:
+        return []
+    try:
+        from tavily import TavilyClient
+        tv = TavilyClient(api_key=settings.tavily_api_key)
+        linkedin_urls: list[str] = []
+        for title in ["Administrator", "Director of Nursing"]:
+            query = f'site:linkedin.com/in "{title}" "{facility_name}" {location}'
+            resp = tv.search(query=query, search_depth="basic", max_results=3)
+            for r in resp.get("results", []):
+                url = r.get("url", "")
+                if "linkedin.com/in/" in url:
+                    clean = url.split("?")[0]
+                    if clean not in linkedin_urls:
+                        linkedin_urls.append(clean)
+        if not linkedin_urls:
+            return []
+        from apify_client import ApifyClient
+        client = ApifyClient(settings.apify_api_key)
+        run = client.actor("2SyF0bVxmgGr8IVCZ").call(
+            run_input={"profileUrls": linkedin_urls[:4]},
+            timeout_secs=120,
+        )
+        profiles = []
+        for item in client.dataset(run["defaultDatasetId"]).iterate_items():
+            if item.get("succeeded") is not False:
+                profiles.append({
+                    "full_name": item.get("fullName", ""),
+                    "headline": item.get("headline", ""),
+                    "job_title": item.get("jobTitle", ""),
+                    "company": item.get("companyName", ""),
+                    "email": item.get("email", ""),
+                    "linkedin_url": item.get("linkedinUrl", ""),
+                    "location": item.get("geoLocationName", ""),
+                })
+        return profiles
+    except Exception:
+        return []
+
+
 def _search_facility(query: str) -> list[dict]:
     try:
         from tavily import TavilyClient
@@ -205,6 +280,21 @@ def web_enricher_node(state: AgentState) -> dict:
             verified_facts={k: v for k, v in cms_enriched.items() if k != "cms_matched"},
             inferred_assumptions={},
         )
+        # Step 1b: Scrape facility website for contact email
+        website = account_data.get("website", "")
+        if website and settings.apify_api_key:
+            contact_info = _fetch_website_contacts(website)
+            if contact_info:
+                account_data.update(contact_info)
+                update_account(state["account_id"], {"raw_data": account_data})
+
+        # Step 1c: Find LinkedIn decision-maker profiles
+        loc = account_data.get("location", "")
+        linkedin_profiles = _fetch_linkedin_profiles(name, loc)
+        if linkedin_profiles:
+            account_data["linkedin_profiles"] = linkedin_profiles
+            update_account(state["account_id"], {"raw_data": account_data})
+
         # If we got bed_count from CMS, no need for Tavily
         if cms_enriched.get("bed_count"):
             return {"account_data": account_data}
