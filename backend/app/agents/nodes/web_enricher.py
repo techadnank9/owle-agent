@@ -162,9 +162,10 @@ def _fetch_website_contacts(website_url: str) -> dict:
                 "startUrls": [{"url": website_url}],
                 "maxCrawlPages": 5,
                 "maxCrawlDepth": 1,
-                "crawlerType": "cheerio",
+                "crawlerType": "playwright:firefox",  # handles JS-rendered content
+                "dynamicContentWaitSecs": 3,
             },
-            timeout_secs=120,
+            timeout_secs=180,
         )
         result: dict = {}
         emails_found: set = set()
