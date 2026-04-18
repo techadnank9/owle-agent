@@ -2,8 +2,9 @@ from typing import TypedDict
 
 
 class AgentState(TypedDict):
-    # Input
+    # Metadata
     account_id: str
+    agent_run_id: str
     account_data: dict
 
     # account_selector output
