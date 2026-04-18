@@ -2,6 +2,7 @@ services:
   - type: web
     name: owle-agent-api
     runtime: python-3.11
+    rootDir: backend
     buildCommand: pip install .
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
@@ -13,3 +14,14 @@ services:
         sync: false
       - key: DATABASE_URL
         sync: false
+      - key: LANGSMITH_API_KEY
+        sync: false
+      - key: LANGCHAIN_TRACING_V2
+        value: "false"
+      - key: APIFY_API_KEY
+        sync: false
+      - key: TAVILY_API_KEY
+        sync: false
+      - key: GMAIL_TOKEN
+        sync: false
+      - key: GMAIL_SENDER_EMAIL
