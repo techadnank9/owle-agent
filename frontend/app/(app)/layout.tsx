@@ -32,6 +32,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <SectionLabel>Engage</SectionLabel>
         <NavLink href="/inbox">Reply Inbox</NavLink>
         <NavLink href="/meetings">Meetings</NavLink>
+        <NavLink href="/pipeline">Deal Pipeline</NavLink>
 
         <SectionLabel>Insights</SectionLabel>
         <NavLink href="/analytics">Analytics</NavLink>
