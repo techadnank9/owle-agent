@@ -11,7 +11,8 @@ type OutreachRow = {
 type ReplyRow = {
   id: string;
   classification: string | null;
-  outreach_actions: { channel: string } | { channel: string }[] | null;
+  outreach_action_id: string | null;
+  outreach_actions: { channel: string; account_id: string } | { channel: string; account_id: string }[] | null;
 };
 
 type MeetingRow = {
@@ -51,7 +52,7 @@ export default function AnalyticsPage() {
 
     const [outreachRes, repliesRes, meetingsRes, signalsRes] = await Promise.all([
       supabase.from("outreach_actions").select("id, channel, status").eq("status", "sent"),
-      supabase.from("replies").select("id, classification, outreach_actions(channel)"),
+      supabase.from("replies").select("id, classification, outreach_action_id, outreach_actions(channel, account_id)"),
       supabase.from("meetings").select("id, status"),
       supabase.from("outcome_signals").select("id, message_angle, channel, reply_received, meeting_booked"),
     ]);
@@ -67,18 +68,31 @@ export default function AnalyticsPage() {
       byChannel[ch] ??= { sent: 0, replies: 0, interested: 0 };
       byChannel[ch].sent++;
     }
+    const seenReplyAccounts: Record<string, Set<string>> = {};
     for (const r of replies) {
       const oa = r.outreach_actions;
       const ch = (Array.isArray(oa) ? oa[0]?.channel : oa?.channel) ?? "unknown";
+      const acct = (Array.isArray(oa) ? oa[0]?.account_id : oa?.account_id) ?? r.id;
       byChannel[ch] ??= { sent: 0, replies: 0, interested: 0 };
-      byChannel[ch].replies++;
-      if (r.classification === "interested") byChannel[ch].interested++;
+      seenReplyAccounts[ch] ??= new Set();
+      if (!seenReplyAccounts[ch].has(acct)) {
+        seenReplyAccounts[ch].add(acct);
+        byChannel[ch].replies++;
+        if (r.classification === "interested") byChannel[ch].interested++;
+      }
     }
 
     const byClassification: Record<string, number> = {};
+    const seenClsAccounts: Record<string, Set<string>> = {};
     for (const r of replies) {
       const cls = r.classification ?? "unclassified";
-      byClassification[cls] = (byClassification[cls] ?? 0) + 1;
+      const oa = r.outreach_actions;
+      const acct = (Array.isArray(oa) ? oa[0]?.account_id : oa?.account_id) ?? r.id;
+      seenClsAccounts[cls] ??= new Set();
+      if (!seenClsAccounts[cls].has(acct)) {
+        seenClsAccounts[cls].add(acct);
+        byClassification[cls] = (byClassification[cls] ?? 0) + 1;
+      }
     }
 
     const byAngle: Record<string, { replies: number; meetings: number }> = {};
@@ -89,10 +103,19 @@ export default function AnalyticsPage() {
       if (s.meeting_booked) byAngle[angle].meetings++;
     }
 
+    // Deduplicate replies by account for rate calculations
+    const repliedAccounts = new Set(replies.map(r => {
+      const oa = r.outreach_actions;
+      return Array.isArray(oa) ? oa[0]?.account_id : oa?.account_id;
+    }).filter(Boolean));
+
     setStats({
       sent: outreach.length,
-      replies: replies.length,
-      interested: replies.filter(r => r.classification === "interested").length,
+      replies: repliedAccounts.size,
+      interested: new Set(replies.filter(r => r.classification === "interested").map(r => {
+        const oa = r.outreach_actions;
+        return Array.isArray(oa) ? oa[0]?.account_id : oa?.account_id;
+      }).filter(Boolean)).size,
       meetings: meetings.filter(m => m.status === "confirmed").length,
       byChannel,
       byClassification,
