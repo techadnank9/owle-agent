@@ -109,6 +109,18 @@ export async function cancelMeeting(id: string) {
   return res.json();
 }
 
+export async function sendReplyResponse(replyId: string) {
+  const res = await fetch(`${API}/webhooks/replies/${replyId}/send-response`, { method: "POST" });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function reprocessReply(replyId: string) {
+  const res = await fetch(`${API}/webhooks/reprocess/${replyId}`, { method: "POST" });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 export async function pasteAccounts(emails: EmailEntry[]) {
   const res = await fetch(`${API}/accounts/add-emails`, {
     method: "POST",

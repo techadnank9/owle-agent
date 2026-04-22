@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { bookMeeting } from "@/lib/api";
+import { bookMeeting, sendReplyResponse } from "@/lib/api";
 
 type Reply = {
   id: string;
@@ -15,7 +15,7 @@ type Reply = {
     subject: string | null;
     body: string | null;
     account_id: string | null;
-    accounts: { name: string; id: string; raw_data: Record<string, unknown> | null } | null;
+    accounts: { name: string; id: string; status: string | null; raw_data: Record<string, unknown> | null } | null;
     contacts: { email: string | null } | null;
   } | null;
 };
@@ -43,10 +43,13 @@ export function ReplyCard({ replies }: { replies: Reply[] }) {
   const cls = latest.classification;
   const colorClass = cls ? (classificationColor[cls] ?? "bg-gray-100 text-gray-600") : "bg-gray-100 text-gray-400";
   const [copied, setCopied] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [showOriginal, setShowOriginal] = useState(false);
+  const alreadyBooked = latest.outreach_actions?.accounts?.status === "meeting_booked";
   const [booking, setBooking] = useState(false);
-  const [booked, setBooked] = useState(false);
+  const [booked, setBooked] = useState(alreadyBooked);
   const [meetLink, setMeetLink] = useState<string | null>(null);
   const [outreachActionId, setOutreachActionId] = useState<string | null>(null);
 
@@ -55,6 +58,19 @@ export function ReplyCard({ replies }: { replies: Reply[] }) {
     navigator.clipboard.writeText(latest.response_draft);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  }
+
+  async function handleSendResponse() {
+    if (sending || sent) return;
+    setSending(true);
+    try {
+      await sendReplyResponse(latest.id);
+      setSent(true);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSending(false);
+    }
   }
 
   const accountId = latest.outreach_actions?.account_id ?? null;
@@ -164,9 +180,20 @@ export function ReplyCard({ replies }: { replies: Reply[] }) {
         <div className="bg-gray-50 rounded p-3 flex flex-col gap-2">
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs text-gray-400">Suggested response</p>
-            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={copyResponse}>
-              {copied ? "Copied!" : "Copy"}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={copyResponse}>
+                {copied ? "Copied!" : "Copy"}
+              </Button>
+              <Button
+                size="sm"
+                variant="default"
+                className="h-7 text-xs bg-blue-600 hover:bg-blue-700"
+                onClick={handleSendResponse}
+                disabled={sending || sent}
+              >
+                {sent ? "Sent ✓" : sending ? "Sending…" : "Send"}
+              </Button>
+            </div>
           </div>
           <p className="text-sm text-gray-700 whitespace-pre-wrap">{latest.response_draft}</p>
         </div>

@@ -11,6 +11,15 @@ def get_client() -> AgentMail:
     return AgentMail(api_key=settings.agentmail_api_key)
 
 
+def reply_in_thread(thread_id: str, body: str) -> str:
+    """Reply to the last message in an AgentMail thread. Returns new message_id."""
+    client = get_client()
+    thread = client.inboxes.threads.get(INBOX_ID, thread_id)
+    last_message_id = thread.last_message_id
+    msg = client.inboxes.messages.reply(INBOX_ID, last_message_id, text=body)
+    return msg.message_id
+
+
 def send_email(to: str, subject: str, body: str) -> tuple[str, str]:
     """Send email via AgentMail. Returns (message_id, thread_id)."""
     client = get_client()

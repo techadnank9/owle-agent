@@ -36,8 +36,8 @@ def create_meeting_event(
 
     event_body = {
         "summary": summary,
-        "start": {"dateTime": start_dt.isoformat(), "timeZone": "America/New_York"},
-        "end":   {"dateTime": end_dt.isoformat(),   "timeZone": "America/New_York"},
+        "start": {"dateTime": start_dt.isoformat(), "timeZone": "America/Los_Angeles"},
+        "end":   {"dateTime": end_dt.isoformat(),   "timeZone": "America/Los_Angeles"},
         "conferenceData": {
             "createRequest": {"requestId": f"owle-{int(start_dt.timestamp())}"}
         },
