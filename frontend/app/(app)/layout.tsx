@@ -19,13 +19,21 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <div className={`${inter.className} bg-gray-50 min-h-screen flex h-screen`}>
       <aside className="w-56 bg-white border-r flex flex-col gap-1 p-4 shrink-0">
         <p className="text-sm font-semibold text-gray-900 mb-4">Owle AI</p>
-        <NavLink href="/accounts">Accounts</NavLink>
+
+        <SectionLabel>Prospecting</SectionLabel>
         <NavLink href="/search">Search SNFs</NavLink>
+        <NavLink href="/accounts">Accounts</NavLink>
+
+        <SectionLabel>Outreach</SectionLabel>
         <NavLink href="/queue">Approval Queue</NavLink>
         <NavLink href="/ready">Ready to Send</NavLink>
         <NavLink href="/sent">Sent</NavLink>
+
+        <SectionLabel>Engage</SectionLabel>
         <NavLink href="/inbox">Reply Inbox</NavLink>
         <NavLink href="/meetings">Meetings</NavLink>
+
+        <SectionLabel>Insights</SectionLabel>
         <NavLink href="/analytics">Analytics</NavLink>
         <NavLink href="/how-it-works">How It Works</NavLink>
         <div className="mt-auto pt-4 border-t">
@@ -50,5 +58,13 @@ function NavLink({ href, children }: { href: string; children: React.ReactNode }
     >
       {children}
     </Link>
+  );
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 px-3 pt-3 pb-0.5">
+      {children}
+    </p>
   );
 }
