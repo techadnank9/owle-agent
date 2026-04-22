@@ -83,10 +83,13 @@ export function MeetingCard({ meeting, onUpdate }: { meeting: Meeting; onUpdate:
       )}
 
       {meeting.calendar_link && (
-        <a href={meeting.calendar_link} target="_blank" rel="noreferrer"
-          className="text-xs text-blue-500 hover:underline">
-          Open calendar event →
-        </a>
+        <div className="flex items-center gap-3">
+          <a href={meeting.calendar_link} target="_blank" rel="noreferrer"
+            className="text-xs text-blue-500 hover:underline font-medium">
+            Join Google Meet →
+          </a>
+          <span className="text-xs text-gray-300 truncate max-w-[200px]">{meeting.calendar_link}</span>
+        </div>
       )}
 
       {meeting.confirmed_at && (

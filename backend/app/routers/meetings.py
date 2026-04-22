@@ -24,18 +24,20 @@ def book_meeting(body: BookMeetingRequest):
         .execute()
     )
     if existing.data:
+        meeting_id = existing.data[0]["id"]
         supabase.table("meetings").update({
             "status": "confirmed",
             "confirmed_at": "now()",
             "proposed_times": [body.proposed_time],
-        }).eq("id", existing.data[0]["id"]).execute()
+        }).eq("id", meeting_id).execute()
     else:
-        supabase.table("meetings").insert({
+        res = supabase.table("meetings").insert({
             "account_id": body.account_id,
             "status": "confirmed",
             "confirmed_at": "now()",
             "proposed_times": [body.proposed_time],
         }).execute()
+        meeting_id = res.data[0]["id"] if res.data else None
 
     supabase.table("accounts").update({"status": "meeting_booked"}).eq("id", body.account_id).execute()
 
@@ -63,9 +65,9 @@ def book_meeting(body: BookMeetingRequest):
             attendee_email=contact.get("email"),
         )
         meet_link = calendar_result.get("meet_link")
-        if meet_link and existing.data:
+        if meet_link and meeting_id:
             supabase.table("meetings").update({"calendar_link": meet_link}) \
-                .eq("id", existing.data[0]["id"]).execute()
+                .eq("id", meeting_id).execute()
     except Exception as e:
         logger.warning("Calendar event creation failed: %s", e)
 
