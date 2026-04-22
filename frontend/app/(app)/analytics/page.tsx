@@ -212,7 +212,7 @@ export default function AnalyticsPage() {
           )}
 
           {/* By message angle */}
-          {Object.keys(stats.byAngle).length > 0 && (
+          {Object.keys(stats.byAngle).filter(a => a !== "unknown").length > 0 && (
             <div className="bg-white border rounded-lg p-5">
               <h2 className="text-sm font-medium text-gray-700 mb-3">By message angle</h2>
               <table className="w-full text-sm">
@@ -225,6 +225,7 @@ export default function AnalyticsPage() {
                 </thead>
                 <tbody>
                   {Object.entries(stats.byAngle)
+                    .filter(([angle]) => angle !== "unknown")
                     .sort((a, b) => b[1].replies - a[1].replies)
                     .map(([angle, d]) => (
                       <tr key={angle} className="border-b last:border-0">
