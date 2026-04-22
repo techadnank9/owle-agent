@@ -51,9 +51,10 @@ def book_meeting(body: BookMeetingRequest):
     )
     contact = contact_res.data[0] if contact_res.data else {}
 
-    # Get account name for Calendar event title
-    acct_res = supabase.table("accounts").select("name").eq("id", body.account_id).limit(1).execute()
+    # Get account name + location for Calendar event
+    acct_res = supabase.table("accounts").select("name, location").eq("id", body.account_id).limit(1).execute()
     acct_name = acct_res.data[0]["name"] if acct_res.data else "Prospect"
+    acct_location = acct_res.data[0].get("location") if acct_res.data else None
 
     # Create Google Calendar event with Meet link
     calendar_result: dict = {"meet_link": None, "event_link": None}
@@ -63,6 +64,7 @@ def book_meeting(body: BookMeetingRequest):
             summary=f"Owle AI × {acct_name}",
             proposed_time_str=body.proposed_time,
             attendee_email=contact.get("email"),
+            location=acct_location,
         )
         meet_link = calendar_result.get("meet_link")
         if meet_link and meeting_id:
