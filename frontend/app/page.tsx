@@ -302,7 +302,7 @@ export default function LandingPage() {
               Owle AI automates your entire GTM motion — from discovering high-fit SNFs to booking a meeting — so your team spends time closing, not prospecting.
             </p>
             <div className="hero-actions">
-              <Link href="/login" className="btn-cta">Get Started Free</Link>
+              <Link href="/login" className="btn-cta">Get Started</Link>
               <a href="#how-it-works" className="btn-outline">See how it works</a>
             </div>
           </div>
@@ -458,7 +458,7 @@ export default function LandingPage() {
             <h2 className="cta-h2">Stop prospecting.<br /><em>Start closing.</em></h2>
             <p className="cta-sub">Get your first leads identified and outreach drafted in minutes.</p>
             <div className="cta-btns">
-              <Link href="/login" className="btn-cta">Get Started Free</Link>
+              <Link href="/login" className="btn-cta">Get Started</Link>
               <a href="#how-it-works" className="btn-outline">See the pipeline</a>
             </div>
           </div>
