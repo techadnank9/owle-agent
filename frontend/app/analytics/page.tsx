@@ -11,7 +11,7 @@ type OutreachRow = {
 type ReplyRow = {
   id: string;
   classification: string | null;
-  outreach_actions: { channel: string } | null;
+  outreach_actions: { channel: string } | { channel: string }[] | null;
 };
 
 type MeetingRow = {
@@ -68,7 +68,8 @@ export default function AnalyticsPage() {
       byChannel[ch].sent++;
     }
     for (const r of replies) {
-      const ch = r.outreach_actions?.channel ?? "unknown";
+      const oa = r.outreach_actions;
+      const ch = (Array.isArray(oa) ? oa[0]?.channel : oa?.channel) ?? "unknown";
       byChannel[ch] ??= { sent: 0, replies: 0, interested: 0 };
       byChannel[ch].replies++;
       if (r.classification === "interested") byChannel[ch].interested++;
