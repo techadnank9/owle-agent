@@ -8,8 +8,11 @@ type Meeting = {
   account_id: string;
   contact_id: string | null;
   status: string;
+  outcome: string | null;
+  notes: string | null;
   proposed_times: string[] | null;
   confirmed_at: string | null;
+  completed_at: string | null;
   calendar_link: string | null;
   accounts: { name: string; location: string | null } | null;
   contacts: { name: string | null; title: string | null; email: string | null } | null;
