@@ -109,20 +109,24 @@ export async function cancelMeeting(id: string) {
   return res.json();
 }
 
-export async function completeMeeting(id: string) {
-  const res = await fetch(`${API}/meetings/${id}/complete`, { method: "POST" });
+export async function completeMeeting(id: string, outcome: "won" | "lost" | "nurture", notes: string) {
+  const res = await fetch(`${API}/meetings/${id}/complete`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ outcome, notes }),
+  });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
 
-export async function setMeetingOutcome(id: string, outcome: "won" | "lost" | "nurture") {
-  const res = await fetch(`${API}/meetings/${id}/outcome`, {
+export async function generateMeetingNotes(id: string, notes: string, accountName: string) {
+  const res = await fetch(`${API}/meetings/${id}/generate-notes`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ outcome }),
+    body: JSON.stringify({ notes, account_name: accountName }),
   });
   if (!res.ok) throw new Error(await res.text());
-  return res.json();
+  return res.json() as Promise<{ generated_notes: string }>;
 }
 
 export async function sendReplyResponse(replyId: string) {

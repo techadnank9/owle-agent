@@ -157,8 +157,16 @@ def cancel_meeting(meeting_id: str):
     return {"status": "cancelled", "meeting_id": meeting_id}
 
 
+class CompleteRequest(BaseModel):
+    outcome: str  # won | lost | nurture
+    notes: str = ""
+
+
 @router.post("/{meeting_id}/complete")
-def complete_meeting(meeting_id: str):
+def complete_meeting(meeting_id: str, body: CompleteRequest):
+    if body.outcome not in ("won", "lost", "nurture"):
+        raise HTTPException(status_code=400, detail="outcome must be won, lost, or nurture")
+
     supabase = get_supabase()
     result = supabase.table("meetings").select("*, accounts(name, location), contacts(id, name, email)").eq("id", meeting_id).limit(1).execute()
     if not result.data:
@@ -168,39 +176,43 @@ def complete_meeting(meeting_id: str):
     if meeting["status"] not in ("confirmed",):
         raise HTTPException(status_code=400, detail="Only confirmed meetings can be completed")
 
+    account_status_map = {"won": "customer", "lost": "churned", "nurture": "nurture"}
     supabase.table("meetings").update({
         "status": "completed",
         "completed_at": "now()",
+        "outcome": body.outcome,
+        "notes": body.notes or None,
     }).eq("id", meeting_id).execute()
+    supabase.table("accounts").update({
+        "status": account_status_map[body.outcome]
+    }).eq("id", meeting["account_id"]).execute()
 
     acct_name = (meeting.get("accounts") or {}).get("name", "Prospect")
     contact = meeting.get("contacts") or {}
-    confirmed_time = meeting.get("confirmed_at") or meeting.get("proposed_times", [None])[0] or "recently"
+    confirmed_time = meeting.get("confirmed_at") or (meeting.get("proposed_times") or [None])[0] or "recently"
+    notes_context = f"\nMeeting notes: {body.notes}" if body.notes else ""
 
-    # Claude drafts follow-up email
-    prompt = f"""Draft a short, warm follow-up email after a sales meeting.
+    subject = f"Great connecting, {acct_name} — next steps"
+    email_body = (
+        f"Hi {contact.get('name', 'there')},\n\nThanks for your time today!\n\n"
+        f"We'll send over a pilot proposal shortly.\n\nBest,\nThe Owle AI Team"
+    )
+    try:
+        prompt = f"""Draft a short, warm follow-up email after a sales meeting.
 
 Account: {acct_name}
-Contact name: {contact.get('name', 'there')}
+Contact: {contact.get('name', 'there')}
 Meeting time: {confirmed_time}
-Product: Owle AI — HIPAA-compliant AI agent for healthcare teams that automates admin tasks, giving clinicians 2+ hours back per day.
+Outcome: {body.outcome}{notes_context}
+Product: Owle AI — HIPAA-compliant AI agent for healthcare teams, automates admin tasks, gives clinicians 2+ hours back per day.
 
-Write a subject line and email body. Be concise, reference the meeting, and include a clear next step (e.g., share a pilot proposal, schedule a follow-up call). Sign as "The Owle AI Team".
+Write a subject line and email body. Be concise, reference the meeting, include a clear next step. Sign as "The Owle AI Team".
 Format:
 SUBJECT: <subject line>
 BODY:
 <email body>"""
-
-    subject = f"Great connecting, {acct_name} — next steps"
-    email_body = f"Hi {contact.get('name', 'there')},\n\nThanks for your time today! It was great learning more about {acct_name}.\n\nWe'll send over a pilot proposal shortly. Looking forward to the next steps.\n\nBest,\nThe Owle AI Team"
-
-    try:
         msg = call_claude(prompt)
-        text = ""
-        for block in msg.content:
-            if hasattr(block, "text"):
-                text = block.text
-                break
+        text = next((b.text for b in msg.content if hasattr(b, "text")), "")
         if "SUBJECT:" in text and "BODY:" in text:
             subject = text.split("SUBJECT:")[1].split("\n")[0].strip()
             email_body = text.split("BODY:")[1].strip()
@@ -224,31 +236,41 @@ BODY:
     return {
         "status": "completed",
         "meeting_id": meeting_id,
+        "outcome": body.outcome,
         "outreach_action_id": outreach_action_id,
         "follow_up_subject": subject,
     }
 
 
-class OutcomeRequest(BaseModel):
-    outcome: str  # won | lost | nurture
+class GenerateNotesRequest(BaseModel):
+    notes: str
+    account_name: str = ""
 
 
-@router.post("/{meeting_id}/outcome")
-def set_meeting_outcome(meeting_id: str, body: OutcomeRequest):
-    if body.outcome not in ("won", "lost", "nurture"):
-        raise HTTPException(status_code=400, detail="outcome must be won, lost, or nurture")
+@router.post("/{meeting_id}/generate-notes")
+def generate_meeting_notes(meeting_id: str, body: GenerateNotesRequest):
+    fallback = body.notes
+    try:
+        prompt = f"""A sales rep has just finished a meeting with {body.account_name or "a prospect"} about Owle AI (HIPAA-compliant AI agent for healthcare admin automation).
 
-    supabase = get_supabase()
-    result = supabase.table("meetings").select("account_id, status").eq("id", meeting_id).limit(1).execute()
-    if not result.data:
-        raise HTTPException(status_code=404, detail="Meeting not found")
+Their raw notes:
+{body.notes}
 
-    meeting = result.data[0]
-    supabase.table("meetings").update({"outcome": body.outcome}).eq("id", meeting_id).execute()
+Rewrite these notes to be clear, structured, and professional. Keep all facts intact. Use this format:
+**What was discussed**
+...
 
-    account_status_map = {"won": "customer", "lost": "churned", "nurture": "nurture"}
-    supabase.table("accounts").update({
-        "status": account_status_map[body.outcome]
-    }).eq("id", meeting["account_id"]).execute()
+**Key points / objections**
+...
 
-    return {"meeting_id": meeting_id, "outcome": body.outcome}
+**Agreed next steps**
+...
+
+Return only the rewritten notes."""
+        msg = call_claude(prompt)
+        generated = next((b.text.strip() for b in msg.content if hasattr(b, "text")), fallback)
+    except Exception as e:
+        logger.warning("Notes generation failed: %s", e)
+        generated = fallback
+
+    return {"generated_notes": generated}
