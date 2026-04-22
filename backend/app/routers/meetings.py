@@ -69,28 +69,37 @@ def book_meeting(body: BookMeetingRequest):
     except Exception as e:
         logger.warning("Calendar event creation failed: %s", e)
 
-    # Create confirmation email draft → Ready to Send (status="approved")
+    # Create confirmation email draft → Ready to Send (status="approved"), deduplicated
     outreach_action_id: str | None = None
     try:
-        meet_link = calendar_result.get("meet_link") or ""
-        link_line = f"\nJoin via Google Meet: {meet_link}\n" if meet_link else ""
-        subject = f"Meeting Confirmed: {body.proposed_time}"
-        email_body = f"""Hi,
+        existing_draft = supabase.table("outreach_actions") \
+            .select("id") \
+            .eq("account_id", body.account_id) \
+            .eq("status", "approved") \
+            .ilike("subject", "Meeting Confirmed%") \
+            .limit(1).execute()
+        if existing_draft.data:
+            outreach_action_id = existing_draft.data[0]["id"]
+        else:
+            meet_link = calendar_result.get("meet_link") or ""
+            link_line = f"\nJoin via Google Meet: {meet_link}\n" if meet_link else ""
+            subject = f"Meeting Confirmed: {body.proposed_time}"
+            email_body = f"""Hi,
 
 Thanks for your time — confirming our meeting scheduled for {body.proposed_time}.{link_line}
 Looking forward to connecting!
 
 Best,
 Owle AI"""
-        draft = create_outreach_action({
-            "account_id": body.account_id,
-            "contact_id": contact.get("id"),
-            "channel": "email",
-            "subject": subject,
-            "body": email_body,
-            "status": "approved",
-        })
-        outreach_action_id = draft.get("id") if draft else None
+            draft = create_outreach_action({
+                "account_id": body.account_id,
+                "contact_id": contact.get("id"),
+                "channel": "email",
+                "subject": subject,
+                "body": email_body,
+                "status": "approved",
+            })
+            outreach_action_id = draft.get("id") if draft else None
     except Exception as e:
         logger.warning("Confirmation email draft creation failed: %s", e)
 
