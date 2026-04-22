@@ -245,13 +245,24 @@ BODY:
 class GenerateNotesRequest(BaseModel):
     notes: str
     account_name: str = ""
+    instruction: str = ""
 
 
 @router.post("/{meeting_id}/generate-notes")
 def generate_meeting_notes(meeting_id: str, body: GenerateNotesRequest):
     fallback = body.notes
     try:
-        prompt = f"""A sales rep has just finished a meeting with {body.account_name or "a prospect"} about Owle AI (HIPAA-compliant AI agent for healthcare admin automation).
+        if body.instruction:
+            prompt = f"""You are refining sales meeting notes for {body.account_name or "a prospect"}.
+
+Current notes:
+{body.notes}
+
+User instruction: {body.instruction}
+
+Apply the instruction to improve the notes. Keep all facts intact. Return only the updated notes."""
+        else:
+            prompt = f"""A sales rep has just finished a meeting with {body.account_name or "a prospect"} about Owle AI (HIPAA-compliant AI agent for healthcare admin automation).
 
 Their raw notes:
 {body.notes}

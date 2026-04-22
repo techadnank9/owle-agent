@@ -46,6 +46,8 @@ export function MeetingCard({ meeting, onUpdate }: { meeting: Meeting; onUpdate:
   const [aiNotes, setAiNotes] = useState("");
   const [showAi, setShowAi] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [instruction, setInstruction] = useState("");
+  const [refining, setRefining] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const colorClass = STATUS_COLORS[meeting.status] ?? "bg-gray-100 text-gray-500";
@@ -75,6 +77,20 @@ export function MeetingCard({ meeting, onUpdate }: { meeting: Meeting; onUpdate:
       console.error(e);
     } finally {
       setGenerating(false);
+    }
+  }
+
+  async function handleRefine() {
+    if (!instruction.trim()) return;
+    setRefining(true);
+    try {
+      const res = await generateMeetingNotes(meeting.id, aiNotes, accountName, instruction);
+      setAiNotes(res.generated_notes);
+      setInstruction("");
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setRefining(false);
     }
   }
 
@@ -280,6 +296,25 @@ export function MeetingCard({ meeting, onUpdate }: { meeting: Meeting; onUpdate:
                 rows={8}
                 className="w-full text-xs text-gray-700 bg-white border border-purple-200 rounded-md px-3 py-2 resize-none focus:outline-none focus:ring-1 focus:ring-purple-400"
               />
+              {/* Refine instruction */}
+              <div className="flex gap-2 items-center">
+                <input
+                  type="text"
+                  value={instruction}
+                  onChange={(e) => setInstruction(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleRefine()}
+                  placeholder="e.g. make it shorter, add next steps, more formal…"
+                  className="flex-1 text-xs border border-purple-200 rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-purple-400 bg-white placeholder:text-gray-300"
+                />
+                <button
+                  disabled={refining || !instruction.trim()}
+                  onClick={handleRefine}
+                  className="text-xs font-medium text-white bg-purple-500 hover:bg-purple-600 disabled:opacity-40 disabled:cursor-not-allowed px-3 py-1.5 rounded-md whitespace-nowrap transition-colors"
+                >
+                  {refining ? "Updating…" : "Update with AI"}
+                </button>
+              </div>
+
               <div className="flex gap-2 pt-1">
                 <button
                   onClick={acceptAi}

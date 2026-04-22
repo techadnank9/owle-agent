@@ -119,11 +119,11 @@ export async function completeMeeting(id: string, outcome: "won" | "lost" | "nur
   return res.json();
 }
 
-export async function generateMeetingNotes(id: string, notes: string, accountName: string) {
+export async function generateMeetingNotes(id: string, notes: string, accountName: string, instruction = "") {
   const res = await fetch(`${API}/meetings/${id}/generate-notes`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ notes, account_name: accountName }),
+    body: JSON.stringify({ notes, account_name: accountName, instruction }),
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json() as Promise<{ generated_notes: string }>;
