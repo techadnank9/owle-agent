@@ -266,7 +266,7 @@ export function MeetingCard({ meeting, onUpdate }: { meeting: Meeting; onUpdate:
           {showAi && aiNotes && (
             <div className="border border-purple-200 bg-purple-50 rounded-md p-3 flex flex-col gap-2">
               <div className="flex items-center justify-between">
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-purple-500">AI Version</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-purple-500">AI Version — edit before accepting</p>
                 <button
                   onClick={() => { setShowAi(false); setAiNotes(""); }}
                   className="text-xs text-gray-400 hover:text-gray-600"
@@ -274,7 +274,12 @@ export function MeetingCard({ meeting, onUpdate }: { meeting: Meeting; onUpdate:
                   ✕
                 </button>
               </div>
-              <p className="text-xs text-gray-700 whitespace-pre-wrap">{aiNotes}</p>
+              <textarea
+                value={aiNotes}
+                onChange={(e) => setAiNotes(e.target.value)}
+                rows={8}
+                className="w-full text-xs text-gray-700 bg-white border border-purple-200 rounded-md px-3 py-2 resize-none focus:outline-none focus:ring-1 focus:ring-purple-400"
+              />
               <div className="flex gap-2 pt-1">
                 <button
                   onClick={acceptAi}
