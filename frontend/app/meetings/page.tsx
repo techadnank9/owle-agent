@@ -11,7 +11,6 @@ type Meeting = {
   proposed_times: string[] | null;
   confirmed_at: string | null;
   calendar_link: string | null;
-  created_at: string;
   accounts: { name: string; location: string | null } | null;
   contacts: { name: string | null; title: string | null; email: string | null } | null;
 };
@@ -27,7 +26,7 @@ export default function MeetingsPage() {
     const { data } = await supabase
       .from("meetings")
       .select("*, accounts(name, location), contacts(name, title, email)")
-      .order("created_at", { ascending: false });
+      .order("confirmed_at", { ascending: false });
     setMeetings((data ?? []) as Meeting[]);
     setLoading(false);
   }, []);

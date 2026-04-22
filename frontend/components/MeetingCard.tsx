@@ -12,7 +12,6 @@ type Meeting = {
   proposed_times: string[] | null;
   confirmed_at: string | null;
   calendar_link: string | null;
-  created_at: string;
   accounts: { name: string; location: string | null } | null;
   contacts: { name: string | null; title: string | null; email: string | null } | null;
 };
@@ -90,9 +89,11 @@ export function MeetingCard({ meeting, onUpdate }: { meeting: Meeting; onUpdate:
         </a>
       )}
 
-      <p className="text-xs text-gray-300">
-        Created {new Date(meeting.created_at).toLocaleString()}
-      </p>
+      {meeting.confirmed_at && (
+        <p className="text-xs text-gray-300">
+          Booked {new Date(meeting.confirmed_at).toLocaleString()}
+        </p>
+      )}
 
       {isActionable && (
         <div className="flex items-center gap-2 pt-1 border-t">
