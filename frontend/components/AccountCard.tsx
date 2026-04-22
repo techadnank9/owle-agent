@@ -34,6 +34,9 @@ function statusColor(status: string) {
     meeting_booked: "text-green-600",
     paused: "text-orange-500",
     excluded: "text-red-400",
+    customer: "text-emerald-600",
+    churned: "text-red-500",
+    nurture: "text-orange-500",
   };
   return map[status] ?? "text-gray-400";
 }

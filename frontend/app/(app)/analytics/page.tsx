@@ -116,7 +116,7 @@ export default function AnalyticsPage() {
         const oa = r.outreach_actions;
         return Array.isArray(oa) ? oa[0]?.account_id : oa?.account_id;
       }).filter(Boolean)).size,
-      meetings: meetings.filter(m => m.status === "confirmed").length,
+      meetings: meetings.filter(m => m.status === "confirmed" || m.status === "completed").length,
       byChannel,
       byClassification,
       byAngle,

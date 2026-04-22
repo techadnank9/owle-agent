@@ -104,6 +104,7 @@ async def gmail_webhook(request: Request):
         "email_subject": None,
         "linkedin_draft": None,
         "hitl_approved": False,
+        "escalate_to_human": False,
         "reply_text": email_body,
         "reply_classification": None,
         "reply_confidence": None,

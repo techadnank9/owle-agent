@@ -18,7 +18,7 @@ type Meeting = {
   contacts: { name: string | null; title: string | null; email: string | null } | null;
 };
 
-const STATUS_ORDER = ["soft_interest", "proposed", "confirmed", "cancelled"];
+const STATUS_ORDER = ["confirmed", "soft_interest", "proposed", "completed", "cancelled"];
 
 export default function MeetingsPage() {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
@@ -49,8 +49,8 @@ export default function MeetingsPage() {
   }, [load]);
 
   const active = meetings.filter(m => m.status !== "cancelled");
-  const confirmed = active.filter(m => m.status === "confirmed");
-  const pending = active.filter(m => m.status !== "confirmed");
+  const confirmed = active.filter(m => m.status === "confirmed" || m.status === "completed");
+  const pending = active.filter(m => m.status === "soft_interest" || m.status === "proposed");
 
   return (
     <div className="max-w-2xl mx-auto">
