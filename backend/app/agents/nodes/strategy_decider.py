@@ -1,7 +1,7 @@
 import json
 from ..state import AgentState
 from ...claude import call_claude
-from ...supabase_client import write_audit_log
+from ...supabase_client import write_audit_log, get_outcome_summary
 
 DECIDE_STRATEGY_TOOL = {
     "name": "decide_strategy",
@@ -26,13 +26,33 @@ def strategy_decider_node(state: AgentState) -> dict:
     account = state["account_data"]
     contacts = state.get("contacts", [])
 
+    # Load accumulated learning from past runs
+    try:
+        outcome_summary = get_outcome_summary()
+    except Exception:
+        outcome_summary = {"angles": [], "channels": [], "total_signals": 0}
+
+    learning_context = ""
+    if outcome_summary["total_signals"] > 0:
+        lines = [f"Past performance data ({outcome_summary['total_signals']} prior outreach runs):"]
+        if outcome_summary["angles"]:
+            lines.append("Angle performance (by reply rate):")
+            for a in outcome_summary["angles"][:5]:
+                lines.append(f"  - {a['angle']}: reply_rate={a['reply_rate']}, meeting_rate={a['meeting_rate']} (n={a['total']})")
+        if outcome_summary["channels"]:
+            lines.append("Channel performance (by reply rate):")
+            for c in outcome_summary["channels"]:
+                lines.append(f"  - {c['channel']}: reply_rate={c['reply_rate']}, meeting_rate={c['meeting_rate']} (n={c['total']})")
+        lines.append("Use this data to prefer angles and channels with higher reply/meeting rates, unless account-specific signals strongly suggest otherwise.")
+        learning_context = "\n".join(lines)
+
     prompt = f"""Decide the outreach strategy for this skilled nursing facility.
 
 Account: {json.dumps(account, indent=2)}
 ICP score: {state.get('icp_score')} | Priority: {state.get('priority_score')}
 Contacts: {json.dumps(contacts, indent=2)}
 Verified facts: {json.dumps(state.get('verified_facts', {}), indent=2)}
-
+{f"{chr(10)}{learning_context}{chr(10)}" if learning_context else ""}
 Owle AI product summary:
 - HIPAA-compliant AI agent for healthcare teams — works with existing systems, zero training, zero new logins
 - Core outcome: gives clinicians/staff 2+ hours back per day by automating admin tasks (scheduling, care coordination, documentation back-and-forth)

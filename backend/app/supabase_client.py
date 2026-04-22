@@ -58,3 +58,56 @@ def create_outreach_action(data: dict) -> dict:
 
 def write_outcome_signal(data: dict) -> None:
     get_supabase().table("outcome_signals").insert(data).execute()
+
+
+def get_outcome_summary() -> dict:
+    """Aggregate outcome_signals into reply/meeting rates by angle and channel."""
+    rows = get_supabase().table("outcome_signals").select(
+        "message_angle, channel, reply_received, meeting_booked"
+    ).execute().data or []
+
+    angles: dict[str, dict] = {}
+    channels: dict[str, dict] = {}
+
+    for r in rows:
+        angle = r.get("message_angle") or "unknown"
+        ch = r.get("channel") or "unknown"
+
+        angles.setdefault(angle, {"total": 0, "replies": 0, "meetings": 0})
+        angles[angle]["total"] += 1
+        if r.get("reply_received"):
+            angles[angle]["replies"] += 1
+        if r.get("meeting_booked"):
+            angles[angle]["meetings"] += 1
+
+        channels.setdefault(ch, {"total": 0, "replies": 0, "meetings": 0})
+        channels[ch]["total"] += 1
+        if r.get("reply_received"):
+            channels[ch]["replies"] += 1
+        if r.get("meeting_booked"):
+            channels[ch]["meetings"] += 1
+
+    def rate(n: int, d: int) -> float:
+        return round(n / d, 2) if d else 0.0
+
+    angle_stats = sorted([
+        {
+            "angle": a,
+            "total": v["total"],
+            "reply_rate": rate(v["replies"], v["total"]),
+            "meeting_rate": rate(v["meetings"], v["total"]),
+        }
+        for a, v in angles.items() if a != "unknown"
+    ], key=lambda x: x["reply_rate"], reverse=True)
+
+    channel_stats = sorted([
+        {
+            "channel": c,
+            "total": v["total"],
+            "reply_rate": rate(v["replies"], v["total"]),
+            "meeting_rate": rate(v["meetings"], v["total"]),
+        }
+        for c, v in channels.items() if c != "unknown"
+    ], key=lambda x: x["reply_rate"], reverse=True)
+
+    return {"angles": angle_stats, "channels": channel_stats, "total_signals": len(rows)}
