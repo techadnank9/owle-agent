@@ -1,8 +1,7 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { use } from "react";
 import { supabase } from "@/lib/supabase";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { enrichAccount } from "@/lib/api";
 
@@ -64,7 +63,7 @@ function AuditEntryCard({ entry, defaultOpen }: { entry: AuditEntry; defaultOpen
           {NODE_LABELS[entry.node] ?? entry.node}
         </span>
         <span className="text-sm text-gray-700 flex-1 truncate">{entry.action}</span>
-        <span className="text-xs text-gray-400 shrink-0">{new Date(entry.created_at).toLocaleTimeString()}</span>
+        <span className="text-xs text-gray-400 shrink-0" suppressHydrationWarning>{new Date(entry.created_at).toLocaleTimeString()}</span>
         {hasDetails && <span className="text-gray-300 text-xs shrink-0">{open ? "▲" : "▼"}</span>}
       </button>
 
@@ -120,28 +119,40 @@ export default function AccountDetailPage({ params }: { params: Promise<{ id: st
   const [enrichMsg, setEnrichMsg] = useState<string | null>(null);
   const [showOldRuns, setShowOldRuns] = useState(false);
   const [contacts, setContacts] = useState<{id: string; name: string | null; title: string; email: string | null; linkedin_url: string | null; source: string; confidence: number | null}[]>([]);
+  const [inferredOpen, setInferredOpen] = useState(false);
+  const [outreachActions, setOutreachActions] = useState<{id: string; channel: string; subject: string | null; status: string; sent_at: string | null}[]>([]);
 
-  function loadData() {
+  const loadData = useCallback(() => {
     supabase.from("accounts").select("*").eq("id", id).single().then(({ data }) => setAccount(data));
     supabase.from("audit_log").select("*").eq("account_id", id).order("created_at").then(({ data }) => setAuditLog(data ?? []));
     supabase.from("contacts").select("*").eq("account_id", id).order("confidence", { ascending: false }).then(({ data }) => setContacts(data ?? []));
-  }
+    supabase.from("outreach_actions").select("id,channel,subject,status,sent_at").eq("account_id", id).then(({ data }) => setOutreachActions(data ?? []));
+  }, [id]);
 
   useEffect(() => {
-    loadData();
+    const initialLoad = setTimeout(() => {
+      loadData();
+    }, 0);
     const interval = setInterval(loadData, 5000);
-    return () => clearInterval(interval);
-  }, [id]);
+    return () => {
+      clearTimeout(initialLoad);
+      clearInterval(interval);
+    };
+  }, [loadData]);
 
   async function handleEnrich() {
     setEnriching(true);
     setEnrichMsg(null);
     try {
       await enrichAccount(id);
-      setEnrichMsg("✓ CMS lookup + re-scoring running in background");
+      setEnrichMsg("⏳ Enriching — LinkedIn profiles + re-scoring running… reloading in 30s");
+      setTimeout(() => {
+        loadData();
+        setEnrichMsg("✓ Done — refresh if LinkedIn profiles not showing yet");
+        setEnriching(false);
+      }, 30000);
     } catch (e: unknown) {
       setEnrichMsg(`Error: ${e instanceof Error ? e.message : String(e)}`);
-    } finally {
       setEnriching(false);
     }
   }
@@ -158,6 +169,18 @@ export default function AccountDetailPage({ params }: { params: Promise<{ id: st
   const runs = Array.from(runMap.entries()).reverse(); // newest first
   const latestRun = runs[0];
   const olderRuns = runs.slice(1);
+
+  // Extract latest strategy from audit log
+  const strategyEntry = [...auditLog].reverse().find(e => e.node === "strategy_decider");
+  const strategyAction = strategyEntry?.action ?? "";
+  // Parse "strategy: pursue via email (founder_led), angle: ..."
+  const stratMatch = strategyAction.match(/strategy:\s*(\w+)\s+via\s+(\S+)\s+\((\w+)\),\s*angle:\s*(.+)/);
+  const strategy = stratMatch ? {
+    action: stratMatch[1],
+    channel: stratMatch[2],
+    lead_type: stratMatch[3],
+    angle: stratMatch[4],
+  } : null;
 
   const raw = account.raw_data;
   const facilityRows: { label: string; value: string; link?: string }[] = [];
@@ -182,8 +205,18 @@ export default function AccountDetailPage({ params }: { params: Promise<{ id: st
   }
 
   // LinkedIn profiles from web_enricher
-  type LinkedInProfile = { full_name: string; headline: string; job_title: string; company: string; email: string; linkedin_url: string; location: string };
+  type LinkedInLocation = string | { parsed?: { text?: string }; linkedinText?: string; countryCode?: string } | null;
+  type LinkedInProfile = { full_name: string; headline: string; job_title: string; company: string; email: string; linkedin_url: string; location: LinkedInLocation };
   const linkedinProfiles: LinkedInProfile[] = (raw?.linkedin_profiles as unknown as LinkedInProfile[]) ?? [];
+  const locText = (l: LinkedInLocation): string => typeof l === "string" ? l : (l?.parsed?.text || l?.linkedinText || "");
+  // Extract readable name from LinkedIn URL slug e.g. "robert-pierce-6a38a830" → "Robert Pierce"
+  const nameFromUrl = (url: string): string => {
+    try {
+      const slug = url.split("/in/")[1]?.split("?")[0] ?? "";
+      const parts = slug.split("-").filter(p => !/^\d+[a-f0-9]*$/.test(p));
+      return parts.map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(" ");
+    } catch { return ""; }
+  };
 
   return (
     <div className="max-w-3xl mx-auto flex flex-col gap-5">
@@ -239,6 +272,23 @@ export default function AccountDetailPage({ params }: { params: Promise<{ id: st
         )}
       </div>
 
+      {/* Strategy — compact card */}
+      {strategy && (
+        <div className="bg-white border rounded-xl p-5">
+          <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-3">Outreach Strategy</p>
+          <div className="flex items-center gap-2 flex-wrap mb-2">
+            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+              strategy.action === "pursue" ? "bg-green-100 text-green-700" :
+              strategy.action === "pause" ? "bg-yellow-100 text-yellow-700" :
+              "bg-orange-100 text-orange-700"
+            }`}>{strategy.action}</span>
+            <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">{strategy.channel}</span>
+            <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{strategy.lead_type.replace("_", " ")}</span>
+          </div>
+          <p className="text-sm text-gray-600">{strategy.angle}</p>
+        </div>
+      )}
+
       {/* Contacts & Decision Makers — always shown */}
       <div className="bg-white border rounded-xl p-5">
         <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-4">Contacts & Decision Makers</p>
@@ -266,10 +316,10 @@ export default function AccountDetailPage({ params }: { params: Promise<{ id: st
               <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-blue-50 border border-blue-100">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <p className="text-sm font-semibold text-gray-900">{p.full_name || "Unknown"}</p>
+                    <p className="text-sm font-semibold text-gray-900">{p.full_name || nameFromUrl(p.linkedin_url) || "Unknown"}</p>
                     <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">{p.job_title || p.headline}</span>
                   </div>
-                  {p.location && <p className="text-xs text-gray-400 mt-0.5">{p.location}</p>}
+                  {locText(p.location) && <p className="text-xs text-gray-400 mt-0.5">{locText(p.location)}</p>}
                   <div className="flex gap-4 mt-1 flex-wrap">
                     {p.email && <a href={`mailto:${p.email}`} className="text-xs text-blue-700 hover:underline font-medium">{p.email}</a>}
                     {p.linkedin_url && <a href={p.linkedin_url} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline">View LinkedIn →</a>}
@@ -280,13 +330,17 @@ export default function AccountDetailPage({ params }: { params: Promise<{ id: st
           </div>
         )}
 
-        {/* Contacts from stakeholder_mapper */}
+        {/* Contacts from stakeholder_mapper — collapsed by default */}
         {contacts.length > 0 && (
           <div className="flex flex-col gap-2">
-            {(linkedinProfiles.length > 0 || raw?.contact_email) && (
-              <p className="text-xs text-gray-400 mb-1">Inferred roles</p>
-            )}
-            {contacts.map(c => (
+            <button
+              onClick={() => setInferredOpen(o => !o)}
+              className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 w-fit"
+            >
+              <span>{inferredOpen ? "▾" : "▸"}</span>
+              <span>Inferred roles ({contacts.length})</span>
+            </button>
+            {inferredOpen && contacts.map(c => (
               <div key={c.id} className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 border">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -313,6 +367,44 @@ export default function AccountDetailPage({ params }: { params: Promise<{ id: st
           <p className="text-sm text-gray-400">No contacts yet — click <strong>Enrich & Re-score</strong> to find emails and LinkedIn profiles.</p>
         )}
       </div>
+
+      {/* Outreach History */}
+      {outreachActions.length > 0 && (
+        <div className="bg-white border rounded-xl p-5">
+          <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-4">Outreach History</p>
+          <div className="flex flex-col gap-2">
+            {outreachActions.map(a => {
+              const statusColors: Record<string, string> = {
+                draft: "bg-gray-100 text-gray-500",
+                pending_approval: "bg-yellow-100 text-yellow-700",
+                approved: "bg-blue-100 text-blue-700",
+                sent: "bg-green-100 text-green-700",
+                failed: "bg-red-100 text-red-600",
+              };
+              const color = statusColors[a.status] ?? "bg-gray-100 text-gray-500";
+              return (
+                <div key={a.id} className="flex items-center justify-between gap-3 py-2 border-b last:border-0">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-xs bg-gray-100 text-gray-500 rounded px-1.5 py-0.5 uppercase shrink-0">{a.channel}</span>
+                    <p className="text-sm text-gray-700 truncate">{a.subject || "(no subject)"}</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${color}`}>{a.status.replace("_", " ")}</span>
+                    {a.sent_at && (
+                      <span className="text-xs text-gray-400" suppressHydrationWarning>{new Date(a.sent_at).toLocaleDateString()}</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {outreachActions.some(a => a.status === "pending_approval") && (
+            <a href="/queue" className="text-xs text-blue-500 hover:underline mt-3 inline-block">
+              Review pending drafts in Approval Queue →
+            </a>
+          )}
+        </div>
+      )}
 
       {/* Audit Log */}
       <div>

@@ -20,8 +20,12 @@ export async function rejectOutreach(id: string) {
   return res.json();
 }
 
-export async function sendOutreach(id: string) {
-  const res = await fetch(`${API}/outreach/${id}/send`, { method: "POST" });
+export async function sendOutreach(id: string, toEmail: string) {
+  const res = await fetch(`${API}/outreach/${id}/send`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ to_email: toEmail }),
+  });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
@@ -76,6 +80,31 @@ export async function bulkImport(facilities: FacilityResult[]) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ facilities }),
   });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function bookMeeting(
+  accountId: string,
+  proposedTime: string,
+): Promise<{ status: string; proposed_time: string; meet_link: string | null; outreach_action_id: string | null }> {
+  const res = await fetch(`${API}/meetings/book`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ account_id: accountId, proposed_time: proposedTime }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function confirmMeeting(id: string) {
+  const res = await fetch(`${API}/meetings/${id}/confirm`, { method: "POST" });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function cancelMeeting(id: string) {
+  const res = await fetch(`${API}/meetings/${id}/cancel`, { method: "POST" });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }

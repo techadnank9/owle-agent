@@ -19,7 +19,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <NavLink href="/accounts">Accounts</NavLink>
             <NavLink href="/search">Search SNFs</NavLink>
             <NavLink href="/queue">Approval Queue</NavLink>
+            <NavLink href="/ready">Ready to Send</NavLink>
+            <NavLink href="/sent">Sent</NavLink>
             <NavLink href="/inbox">Reply Inbox</NavLink>
+            <NavLink href="/meetings">Meetings</NavLink>
+            <NavLink href="/analytics">Analytics</NavLink>
             <NavLink href="/how-it-works">How It Works</NavLink>
           </aside>
           <main className="flex-1 overflow-auto p-6">{children}</main>

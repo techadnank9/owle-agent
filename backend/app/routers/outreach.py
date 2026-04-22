@@ -1,5 +1,8 @@
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+from typing import Optional
 from ..supabase_client import get_supabase
+from ..agentmail_client import send_email
 
 router = APIRouter()
 
@@ -45,8 +48,12 @@ def reject_outreach(outreach_id: str):
     return {"status": "returned_to_draft", "outreach_id": outreach_id}
 
 
+class SendRequest(BaseModel):
+    to_email: Optional[str] = None
+
+
 @router.post("/{outreach_id}/send")
-def send_outreach(outreach_id: str):
+def send_outreach(outreach_id: str, body: SendRequest = SendRequest()):
     supabase = get_supabase()
     result = (
         supabase.table("outreach_actions")
@@ -60,14 +67,14 @@ def send_outreach(outreach_id: str):
         raise HTTPException(status_code=404, detail="Approved outreach action not found")
 
     action = result.data[0]
-    contact = action.get("contacts") or {}
-    to_email = contact.get("email")
+
+    # Use explicitly provided email, else fall back to contact's email
+    to_email = body.to_email or (action.get("contacts") or {}).get("email")
 
     if not to_email:
-        raise HTTPException(status_code=422, detail="No verified email for this contact — send manually")
+        raise HTTPException(status_code=422, detail="No email specified — select a recipient and try again")
 
-    from ..gmail import send_email
-    thread_id = send_email(
+    message_id, thread_id = send_email(
         to=to_email,
         subject=action["subject"] or "",
         body=action["body"] or "",
@@ -75,11 +82,11 @@ def send_outreach(outreach_id: str):
 
     supabase.table("outreach_actions").update({
         "status": "sent",
-        "gmail_thread_id": thread_id,
         "sent_at": "now()",
+        "gmail_thread_id": thread_id,  # AgentMail thread_id — used by reply webhook to match incoming replies
     }).eq("id", outreach_id).execute()
 
-    return {"status": "sent", "outreach_id": outreach_id, "gmail_thread_id": thread_id}
+    return {"status": "sent", "outreach_id": outreach_id, "to": to_email, "message_id": message_id, "thread_id": thread_id}
 
 
 @router.get("/account/{account_id}")

@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
 from .db import init_checkpointer
-from .routers import accounts, outreach, webhooks
+from .routers import accounts, outreach, webhooks, meetings
 
 
 @asynccontextmanager
@@ -25,6 +25,7 @@ app.add_middleware(
 app.include_router(accounts.router, prefix="/accounts", tags=["accounts"])
 app.include_router(outreach.router, prefix="/outreach", tags=["outreach"])
 app.include_router(webhooks.router, prefix="/webhooks", tags=["webhooks"])
+app.include_router(meetings.router, prefix="/meetings", tags=["meetings"])
 
 
 @app.get("/health")

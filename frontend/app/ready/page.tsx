@@ -29,23 +29,20 @@ type AccountGroup = {
   drafts: OutreachAction[];
 };
 
-type Filter = "all" | "high" | "email" | "linkedin";
-
-export default function QueuePage() {
+export default function ReadyToSendPage() {
   const [items, setItems] = useState<OutreachAction[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<Filter>("all");
+  const [filter, setFilter] = useState<"all" | "email" | "linkedin">("all");
 
   const load = useCallback(async () => {
     setLoading(true);
     const { data: actions } = await supabase
       .from("outreach_actions")
       .select("*, accounts(name, icp_score, location, raw_data), contacts(name, title, email, linkedin_url)")
-      .eq("status", "pending_approval");
+      .eq("status", "approved");
 
     if (!actions) { setLoading(false); return; }
 
-    // For records with no contact_id, fetch best contact by account_id
     const missingIds = [...new Set(actions.filter(a => !a.contacts).map(a => a.account_id))];
     const contactMap: Record<string, OutreachAction["contacts"]> = {};
     if (missingIds.length) {
@@ -90,13 +87,13 @@ export default function QueuePage() {
   useEffect(() => {
     const initialLoad = setTimeout(() => { void load(); }, 0);
     const channel = supabase
-      .channel("queue-changes")
+      .channel("ready-changes")
       .on("postgres_changes", { event: "*", schema: "public", table: "outreach_actions" }, load)
       .subscribe();
     return () => { clearTimeout(initialLoad); supabase.removeChannel(channel); };
   }, [load]);
 
-  // Group by account
+  // Group by account, sorted by ICP desc
   const grouped = new Map<string, AccountGroup>();
   for (const item of items) {
     const key = item.account_id;
@@ -114,38 +111,33 @@ export default function QueuePage() {
 
   let groups = Array.from(grouped.values()).sort((a, b) => (b.icp_score ?? 0) - (a.icp_score ?? 0));
 
-  // Apply filter
-  if (filter === "high") groups = groups.filter(g => (g.icp_score ?? 0) >= 80);
   if (filter === "email") groups = groups.map(g => ({ ...g, drafts: g.drafts.filter(d => d.channel === "email") })).filter(g => g.drafts.length > 0);
   if (filter === "linkedin") groups = groups.map(g => ({ ...g, drafts: g.drafts.filter(d => d.channel === "linkedin") })).filter(g => g.drafts.length > 0);
 
-  const totalAccounts = grouped.size;
-  const highPriority = Array.from(grouped.values()).filter(g => (g.icp_score ?? 0) >= 80).length;
-
-  const FILTERS: { key: Filter; label: string }[] = [
-    { key: "all", label: `All (${totalAccounts})` },
-    { key: "high", label: `High ICP 80+ (${highPriority})` },
-    { key: "email", label: "Email only" },
-    { key: "linkedin", label: "LinkedIn only" },
-  ];
+  const emailCount = items.filter(i => i.channel === "email").length;
+  const linkedinCount = items.filter(i => i.channel === "linkedin").length;
 
   return (
     <div className="max-w-2xl mx-auto">
       <div className="mb-5">
-        <h1 className="text-xl font-semibold text-gray-900">Approval Queue</h1>
-        <p className="text-sm text-gray-500">{totalAccounts} accounts · {items.length} drafts</p>
+        <h1 className="text-xl font-semibold text-gray-900">Ready to Send</h1>
+        <p className="text-sm text-gray-500">
+          {grouped.size} accounts · {emailCount} emails · {linkedinCount} LinkedIn
+        </p>
       </div>
 
       {/* Filter tabs */}
       <div className="flex gap-1 mb-5 bg-gray-100 rounded-lg p-1">
-        {FILTERS.map(f => (
+        {[
+          { key: "all" as const, label: `All (${items.length})` },
+          { key: "email" as const, label: `Email (${emailCount})` },
+          { key: "linkedin" as const, label: `LinkedIn (${linkedinCount})` },
+        ].map(f => (
           <button
             key={f.key}
             onClick={() => setFilter(f.key)}
             className={`flex-1 text-xs py-1.5 px-2 rounded-md transition-colors font-medium ${
-              filter === f.key
-                ? "bg-white text-gray-900 shadow-sm"
-                : "text-gray-500 hover:text-gray-700"
+              filter === f.key ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
             }`}
           >
             {f.label}
@@ -156,12 +148,14 @@ export default function QueuePage() {
       {loading ? (
         <p className="text-sm text-gray-400">Loading…</p>
       ) : groups.length === 0 ? (
-        <p className="text-sm text-gray-400">Queue is empty — upload accounts to generate drafts.</p>
+        <div className="text-center py-12 text-gray-400">
+          <p className="text-sm">Nothing ready to send yet.</p>
+          <p className="text-xs mt-1">Approve drafts in the Approval Queue to see them here.</p>
+        </div>
       ) : (
         <div className="flex flex-col gap-6">
           {groups.map(group => (
             <div key={group.account_id} className="flex flex-col gap-2">
-              {/* Account header */}
               <div className="flex items-center gap-2 px-1">
                 <span className="text-sm font-semibold text-gray-800">{group.name}</span>
                 {group.location && <span className="text-xs text-gray-400">{group.location}</span>}
@@ -171,7 +165,6 @@ export default function QueuePage() {
                   </Badge>
                 )}
               </div>
-              {/* Drafts for this account */}
               <div className="flex flex-col gap-2">
                 {group.drafts.map(item => (
                   <OutreachCard key={item.id} action={item} onUpdate={load} compact />

@@ -237,28 +237,34 @@ def _fetch_linkedin_profiles(facility_name: str, location: str, company_linkedin
             except Exception:
                 pass
 
-        # Step B: Search LinkedIn for Administrators and DONs at this facility
+        # Step B: Search LinkedIn by company name — one broad search, filter locally by role
+        DECISION_MAKER_TITLES = ["administrator", "director", "don", "coo", "ceo", "vp", "president", "manager", "executive"]
         if not linkedin_urls:
-            for title in ["Administrator", "Director of Nursing"]:
-                try:
-                    run = client.actor("harvestapi~linkedin-profile-search").call(
-                        run_input={
-                            "searchQuery": f"{title} {facility_name}",
-                            "currentJobTitles": [title],
-                            "maxItems": 3,
-                        },
-                        timeout_secs=60,
-                    )
-                    for item in client.dataset(run["defaultDatasetId"]).iterate_items():
-                        url = item.get("profileUrl") or item.get("linkedinUrl") or item.get("url", "")
-                        if url and "linkedin.com/in/" in url:
-                            clean = url.split("?")[0]
-                            if clean not in linkedin_urls:
-                                linkedin_urls.append(clean)
-                        if not company_url:
-                            company_url = item.get("companyLinkedinUrl", "")
-                except Exception:
-                    pass
+            try:
+                run = client.actor("harvestapi~linkedin-profile-search").call(
+                    run_input={
+                        "searchQuery": facility_name,
+                        "maxItems": 10,
+                    },
+                    timeout_secs=60,
+                )
+                for item in client.dataset(run["defaultDatasetId"]).iterate_items():
+                    # filter to decision-maker roles only
+                    headline = (item.get("headline") or "").lower()
+                    cur_pos = item.get("currentPosition") or []
+                    pos_title = (cur_pos[0].get("position", "") if cur_pos else "").lower()
+                    if not any(t in headline or t in pos_title for t in DECISION_MAKER_TITLES):
+                        continue
+                    url = item.get("linkedinUrl") or item.get("profileUrl") or item.get("url", "")
+                    if url and "linkedin.com/in/" in url:
+                        clean = url.split("?")[0]
+                        if clean not in linkedin_urls:
+                            linkedin_urls.append(clean)
+                    if not company_url:
+                        co_pos = item.get("currentPosition") or []
+                        company_url = (co_pos[0].get("companyLinkedinUrl", "") if co_pos else "") or item.get("companyLinkedinUrl", "")
+            except Exception:
+                pass
 
         # Primary: harvestapi/linkedin-profile-scraper (free plan compatible, 4.71★, 16k users)
         if linkedin_urls:
@@ -272,34 +278,39 @@ def _fetch_linkedin_profiles(facility_name: str, location: str, company_linkedin
                     timeout_secs=120,
                 )
                 for item in client.dataset(run2["defaultDatasetId"]).iterate_items():
-                    # harvestapi returns firstName/lastName separately, headline as title
-                    first = item.get("firstName", "")
-                    last = item.get("lastName", "")
-                    full_name = item.get("fullName", "") or f"{first} {last}".strip() or item.get("name", "")
-                    headline = item.get("headline", "")
-                    # Extract job title from headline or currentPosition
-                    job_title = item.get("jobTitle", "") or item.get("title", "")
-                    if not job_title and headline:
-                        # e.g. "Administrator Sunnyvale Gardens Post Acute" → "Administrator"
-                        job_title = headline.split(" ")[0] if headline else ""
-                    # Extract company from currentPosition
+                    # harvestapi returns firstName/lastName separately
+                    first = item.get("firstName", "") or ""
+                    last = item.get("lastName", "") or ""
+                    full_name = f"{first} {last}".strip() or item.get("name", "")
+                    headline = item.get("headline", "") or ""
+                    # job_title: currentPosition[0].position is most accurate
+                    # jobTitle/title not present at root in profile-search output
+                    cur_pos = item.get("currentPosition") or []
+                    job_title = (
+                        item.get("jobTitle", "")
+                        or item.get("title", "")
+                        or (cur_pos[0].get("position", "") if cur_pos else "")
+                        or headline
+                    )
+                    # company: root companyName or currentPosition[0].companyName
                     company = item.get("companyName", "") or item.get("company", "")
-                    if not company:
-                        pos = item.get("currentPosition", [])
-                        if pos and isinstance(pos, list):
-                            company = pos[0].get("companyName", "") if pos else ""
-                    # Location
+                    if not company and cur_pos:
+                        company = cur_pos[0].get("companyName", "")
+                    # email: scalar or first element of emails[]
+                    emails_list = item.get("emails") or []
+                    email = item.get("email", "") or (emails_list[0] if emails_list else "")
+                    # location: may be dict {linkedinText, countryCode, parsed}
                     loc_raw = item.get("location", "") or item.get("geoLocationName", "")
                     if isinstance(loc_raw, dict):
                         loc_str = loc_raw.get("parsed", {}).get("text", "") or loc_raw.get("linkedinText", "")
                     else:
-                        loc_str = str(loc_raw)
+                        loc_str = str(loc_raw) if loc_raw else ""
                     profiles.append({
-                        "full_name": full_name,
+                        "full_name": full_name or headline or "Unknown",
                         "headline": headline,
                         "job_title": job_title,
                         "company": company,
-                        "email": item.get("email", "") or item.get("emails", [""])[0] if item.get("emails") else "",
+                        "email": email,
                         "linkedin_url": item.get("linkedinUrl", "") or item.get("profileUrl", ""),
                         "location": loc_str,
                     })
@@ -316,9 +327,10 @@ def _fetch_linkedin_profiles(facility_name: str, location: str, company_linkedin
                     )
                     for item in client.dataset(run2["defaultDatasetId"]).iterate_items():
                         if item.get("succeeded") is not False:
+                            _hn = item.get("headline", "")
                             profiles.append({
-                                "full_name": item.get("fullName", ""),
-                                "headline": item.get("headline", ""),
+                                "full_name": item.get("fullName", "") or _hn or "Unknown",
+                                "headline": _hn,
                                 "job_title": item.get("jobTitle", ""),
                                 "company": item.get("companyName", ""),
                                 "email": item.get("email", ""),

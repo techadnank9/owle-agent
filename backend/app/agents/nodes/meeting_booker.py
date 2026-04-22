@@ -62,7 +62,7 @@ Call assess_meeting_intent."""
         next_steps = tool_use.input["next_steps"]
         rationale = tool_use.input["rationale"]
 
-    if meeting_status in ("confirmed", "proposed"):
+    if meeting_status in ("confirmed", "proposed", "soft_interest"):
         get_supabase().table("meetings").insert({
             "account_id": state["account_id"],
             "status": meeting_status,

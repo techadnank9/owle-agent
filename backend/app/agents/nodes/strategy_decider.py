@@ -33,16 +33,22 @@ ICP score: {state.get('icp_score')} | Priority: {state.get('priority_score')}
 Contacts: {json.dumps(contacts, indent=2)}
 Verified facts: {json.dumps(state.get('verified_facts', {}), indent=2)}
 
-Owle AI context:
-- Early-stage company, founder-led preferred for high-value targets (icp_score > 75)
-- Email is better than LinkedIn for SNF administrators and operators
-- Best angles: reducing documentation burden, improving care coordination, staffing workflow efficiency
+Owle AI product summary:
+- HIPAA-compliant AI agent for healthcare teams — works with existing systems, zero training, zero new logins
+- Core outcome: gives clinicians/staff 2+ hours back per day by automating admin tasks (scheduling, care coordination, documentation back-and-forth)
+- Business outcome: reduce staff burnout/turnover, improve margins without new hires, results in 30 days
+- Model: pilot-first (limited Q4 spots), low commitment to start
 
-Decide:
-- action: pursue=go now, pause=wait, escalate=human review needed
-- channel: email leads for most SNF operators
-- lead_type: founder_led if icp_score > 75
-- angle: the single most specific, credible angle for THIS facility
+Strategy rules:
+- action: pursue if icp_score >= 60, pause if 40-59, escalate if data is missing or confusing
+- channel: email for Administrators/DONs/COOs (email leads); linkedin if we have a direct profile URL
+- lead_type: founder_led if icp_score >= 75 (high-value, personal touch matters); agent_led otherwise
+- angle: pick the SINGLE most credible angle for THIS facility based on their data:
+  * "staffing" — if high nurse turnover or low staffing ratings (strong pain point)
+  * "documentation" — if CMS staffing burden indicators present
+  * "care_coordination" — if multi-location or specialist referral patterns implied
+  * "margins" — if recent fines, low CMS rating, or cost pressure signals
+  * "operational_efficiency" — default if no specific signal
 
 Call decide_strategy."""
 
