@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { confirmMeeting, cancelMeeting } from "@/lib/api";
+import { confirmMeeting, cancelMeeting, completeMeeting, setMeetingOutcome } from "@/lib/api";
 import Link from "next/link";
 
 type Meeting = {
@@ -9,8 +9,10 @@ type Meeting = {
   account_id: string;
   contact_id: string | null;
   status: string;
+  outcome: string | null;
   proposed_times: string[] | null;
   confirmed_at: string | null;
+  completed_at: string | null;
   calendar_link: string | null;
   accounts: { name: string; location: string | null } | null;
   contacts: { name: string | null; title: string | null; email: string | null } | null;
@@ -21,6 +23,13 @@ const STATUS_COLORS: Record<string, string> = {
   proposed: "bg-blue-100 text-blue-700",
   confirmed: "bg-green-100 text-green-700",
   cancelled: "bg-gray-100 text-gray-500",
+  completed: "bg-purple-100 text-purple-700",
+};
+
+const OUTCOME_COLORS: Record<string, string> = {
+  won: "bg-green-100 text-green-700",
+  lost: "bg-red-100 text-red-700",
+  nurture: "bg-orange-100 text-orange-700",
 };
 
 export function MeetingCard({ meeting, onUpdate }: { meeting: Meeting; onUpdate: () => void }) {
@@ -33,6 +42,8 @@ export function MeetingCard({ meeting, onUpdate }: { meeting: Meeting; onUpdate:
 
   const colorClass = STATUS_COLORS[meeting.status] ?? "bg-gray-100 text-gray-500";
   const isActionable = meeting.status === "soft_interest" || meeting.status === "proposed";
+  const isConfirmed = meeting.status === "confirmed";
+  const isCompleted = meeting.status === "completed";
 
   return (
     <div className="bg-white border rounded-lg p-5 flex flex-col gap-3">
@@ -48,9 +59,16 @@ export function MeetingCard({ meeting, onUpdate }: { meeting: Meeting; onUpdate:
             <p className="text-xs text-gray-400">{meeting.accounts.location}</p>
           )}
         </div>
-        <span className={`text-xs font-medium px-2 py-1 rounded-full capitalize shrink-0 ${colorClass}`}>
-          {meeting.status.replace("_", " ")}
-        </span>
+        <div className="flex items-center gap-2 shrink-0">
+          {meeting.outcome && (
+            <span className={`text-xs font-medium px-2 py-1 rounded-full capitalize ${OUTCOME_COLORS[meeting.outcome] ?? "bg-gray-100 text-gray-500"}`}>
+              {meeting.outcome}
+            </span>
+          )}
+          <span className={`text-xs font-medium px-2 py-1 rounded-full capitalize ${colorClass}`}>
+            {meeting.status.replace("_", " ")}
+          </span>
+        </div>
       </div>
 
       {meeting.contacts && (
@@ -82,6 +100,12 @@ export function MeetingCard({ meeting, onUpdate }: { meeting: Meeting; onUpdate:
         </p>
       )}
 
+      {meeting.completed_at && (
+        <p className="text-xs text-purple-600">
+          Completed {new Date(meeting.completed_at).toLocaleDateString()}
+        </p>
+      )}
+
       {meeting.calendar_link && (
         <div className="flex items-center gap-3">
           <a href={meeting.calendar_link} target="_blank" rel="noreferrer"
@@ -90,12 +114,6 @@ export function MeetingCard({ meeting, onUpdate }: { meeting: Meeting; onUpdate:
           </a>
           <span className="text-xs text-gray-300 truncate max-w-[200px]">{meeting.calendar_link}</span>
         </div>
-      )}
-
-      {meeting.confirmed_at && (
-        <p className="text-xs text-gray-300">
-          Booked {new Date(meeting.confirmed_at).toLocaleString()}
-        </p>
       )}
 
       {isActionable && (
@@ -115,6 +133,60 @@ export function MeetingCard({ meeting, onUpdate }: { meeting: Meeting; onUpdate:
           >
             Cancel
           </Button>
+        </div>
+      )}
+
+      {isConfirmed && (
+        <div className="flex items-center gap-2 pt-1 border-t">
+          <Button
+            size="sm"
+            className="bg-purple-600 hover:bg-purple-700 text-white"
+            disabled={loading !== null}
+            onClick={() => handle(() => completeMeeting(meeting.id), "completing")}
+          >
+            {loading === "completing" ? "Marking…" : "Mark Complete"}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={loading !== null}
+            onClick={() => handle(() => cancelMeeting(meeting.id), "cancelling")}
+          >
+            Cancel
+          </Button>
+        </div>
+      )}
+
+      {isCompleted && !meeting.outcome && (
+        <div className="pt-1 border-t">
+          <p className="text-xs text-gray-400 mb-2">Deal outcome</p>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              className="bg-green-600 hover:bg-green-700 text-white"
+              disabled={loading !== null}
+              onClick={() => handle(() => setMeetingOutcome(meeting.id, "won"), "won")}
+            >
+              {loading === "won" ? "Saving…" : "Won"}
+            </Button>
+            <Button
+              size="sm"
+              className="bg-orange-500 hover:bg-orange-600 text-white"
+              disabled={loading !== null}
+              onClick={() => handle(() => setMeetingOutcome(meeting.id, "nurture"), "nurture")}
+            >
+              {loading === "nurture" ? "Saving…" : "Nurture"}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-red-500 hover:text-red-600"
+              disabled={loading !== null}
+              onClick={() => handle(() => setMeetingOutcome(meeting.id, "lost"), "lost")}
+            >
+              {loading === "lost" ? "Saving…" : "Lost"}
+            </Button>
+          </div>
         </div>
       )}
     </div>

@@ -2,6 +2,7 @@ import logging
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from ..supabase_client import get_supabase, create_outreach_action
+from ..claude import call_claude
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -154,3 +155,100 @@ def cancel_meeting(meeting_id: str):
 
     supabase.table("meetings").update({"status": "cancelled"}).eq("id", meeting_id).execute()
     return {"status": "cancelled", "meeting_id": meeting_id}
+
+
+@router.post("/{meeting_id}/complete")
+def complete_meeting(meeting_id: str):
+    supabase = get_supabase()
+    result = supabase.table("meetings").select("*, accounts(name, location), contacts(id, name, email)").eq("id", meeting_id).limit(1).execute()
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+
+    meeting = result.data[0]
+    if meeting["status"] not in ("confirmed",):
+        raise HTTPException(status_code=400, detail="Only confirmed meetings can be completed")
+
+    supabase.table("meetings").update({
+        "status": "completed",
+        "completed_at": "now()",
+    }).eq("id", meeting_id).execute()
+
+    acct_name = (meeting.get("accounts") or {}).get("name", "Prospect")
+    contact = meeting.get("contacts") or {}
+    confirmed_time = meeting.get("confirmed_at") or meeting.get("proposed_times", [None])[0] or "recently"
+
+    # Claude drafts follow-up email
+    prompt = f"""Draft a short, warm follow-up email after a sales meeting.
+
+Account: {acct_name}
+Contact name: {contact.get('name', 'there')}
+Meeting time: {confirmed_time}
+Product: Owle AI — HIPAA-compliant AI agent for healthcare teams that automates admin tasks, giving clinicians 2+ hours back per day.
+
+Write a subject line and email body. Be concise, reference the meeting, and include a clear next step (e.g., share a pilot proposal, schedule a follow-up call). Sign as "The Owle AI Team".
+Format:
+SUBJECT: <subject line>
+BODY:
+<email body>"""
+
+    subject = f"Great connecting, {acct_name} — next steps"
+    email_body = f"Hi {contact.get('name', 'there')},\n\nThanks for your time today! It was great learning more about {acct_name}.\n\nWe'll send over a pilot proposal shortly. Looking forward to the next steps.\n\nBest,\nThe Owle AI Team"
+
+    try:
+        msg = call_claude(prompt)
+        text = ""
+        for block in msg.content:
+            if hasattr(block, "text"):
+                text = block.text
+                break
+        if "SUBJECT:" in text and "BODY:" in text:
+            subject = text.split("SUBJECT:")[1].split("\n")[0].strip()
+            email_body = text.split("BODY:")[1].strip()
+    except Exception as e:
+        logger.warning("Claude follow-up draft failed: %s", e)
+
+    outreach_action_id = None
+    try:
+        draft = create_outreach_action({
+            "account_id": meeting["account_id"],
+            "contact_id": contact.get("id"),
+            "channel": "email",
+            "subject": subject,
+            "body": email_body,
+            "status": "approved",
+        })
+        outreach_action_id = draft.get("id") if draft else None
+    except Exception as e:
+        logger.warning("Follow-up draft creation failed: %s", e)
+
+    return {
+        "status": "completed",
+        "meeting_id": meeting_id,
+        "outreach_action_id": outreach_action_id,
+        "follow_up_subject": subject,
+    }
+
+
+class OutcomeRequest(BaseModel):
+    outcome: str  # won | lost | nurture
+
+
+@router.post("/{meeting_id}/outcome")
+def set_meeting_outcome(meeting_id: str, body: OutcomeRequest):
+    if body.outcome not in ("won", "lost", "nurture"):
+        raise HTTPException(status_code=400, detail="outcome must be won, lost, or nurture")
+
+    supabase = get_supabase()
+    result = supabase.table("meetings").select("account_id, status").eq("id", meeting_id).limit(1).execute()
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+
+    meeting = result.data[0]
+    supabase.table("meetings").update({"outcome": body.outcome}).eq("id", meeting_id).execute()
+
+    account_status_map = {"won": "customer", "lost": "churned", "nurture": "nurture"}
+    supabase.table("accounts").update({
+        "status": account_status_map[body.outcome]
+    }).eq("id", meeting["account_id"]).execute()
+
+    return {"meeting_id": meeting_id, "outcome": body.outcome}

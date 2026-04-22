@@ -109,6 +109,22 @@ export async function cancelMeeting(id: string) {
   return res.json();
 }
 
+export async function completeMeeting(id: string) {
+  const res = await fetch(`${API}/meetings/${id}/complete`, { method: "POST" });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function setMeetingOutcome(id: string, outcome: "won" | "lost" | "nurture") {
+  const res = await fetch(`${API}/meetings/${id}/outcome`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ outcome }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 export async function sendReplyResponse(replyId: string) {
   const res = await fetch(`${API}/webhooks/replies/${replyId}/send-response`, { method: "POST" });
   if (!res.ok) throw new Error(await res.text());
