@@ -3,17 +3,23 @@ import { useState } from "react";
 import { createClient } from "@/lib/supabase-browser";
 
 export default function LoginPage() {
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState<"google" | "guest" | null>(null);
 
   async function handleGoogleLogin() {
-    setLoading(true);
+    setLoading("google");
     const supabase = createClient();
     await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
+      options: { redirectTo: `${window.location.origin}/auth/callback` },
     });
+  }
+
+  async function handleGuest() {
+    setLoading("guest");
+    const supabase = createClient();
+    const { error } = await supabase.auth.signInAnonymously();
+    if (!error) window.location.href = "/accounts";
+    else setLoading(null);
   }
 
   return (
@@ -137,6 +143,27 @@ export default function LoginPage() {
           cursor: not-allowed;
         }
 
+        .guest-btn {
+          width: 100%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 0.5rem;
+          background: transparent;
+          color: #6b6b6b;
+          border: 1px solid rgba(255,255,255,0.08);
+          border-radius: 7px;
+          padding: 0.75rem 1.5rem;
+          font-family: 'DM Sans', sans-serif;
+          font-size: 0.85rem;
+          font-weight: 400;
+          cursor: pointer;
+          transition: all 0.2s;
+          letter-spacing: 0.01em;
+        }
+        .guest-btn:hover:not(:disabled) { border-color: rgba(255,255,255,0.15); color: #f0ebe0; }
+        .guest-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
         .google-icon {
           width: 18px;
           height: 18px;
@@ -191,7 +218,7 @@ export default function LoginPage() {
           <button
             className="google-btn"
             onClick={handleGoogleLogin}
-            disabled={loading}
+            disabled={loading !== null}
           >
             <svg className="google-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
@@ -199,7 +226,17 @@ export default function LoginPage() {
               <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
               <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
             </svg>
-            {loading ? "Redirecting…" : "Continue with Google"}
+            {loading === "google" ? "Redirecting…" : "Continue with Google"}
+          </button>
+
+          <div style={{display:"flex",alignItems:"center",gap:"0.75rem",width:"100%"}}>
+            <div className="divider" style={{flex:1}} />
+            <span style={{fontSize:"0.72rem",color:"#3a3a3a",whiteSpace:"nowrap"}}>or</span>
+            <div className="divider" style={{flex:1}} />
+          </div>
+
+          <button className="guest-btn" onClick={handleGuest} disabled={loading !== null}>
+            {loading === "guest" ? "Entering…" : "Continue as Guest"}
           </button>
 
           <p className="login-terms">
