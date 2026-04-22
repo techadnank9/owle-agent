@@ -74,8 +74,9 @@ export function ReplyCard({ replies }: { replies: Reply[] }) {
     setBooking(true);
     try {
       const result = await bookMeeting(accountId, proposedTime ?? "TBD");
+      if (!result.meet_link) throw new Error("No Meet link returned");
       setBooked(true);
-      if (result.meet_link) setMeetLink(result.meet_link);
+      setMeetLink(result.meet_link);
       if (result.outreach_action_id) setOutreachActionId(result.outreach_action_id);
     } catch (e) {
       console.error(e);
