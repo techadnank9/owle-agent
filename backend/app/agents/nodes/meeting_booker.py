@@ -63,11 +63,25 @@ Call assess_meeting_intent."""
         rationale = tool_use.input["rationale"]
 
     if meeting_status in ("confirmed", "proposed", "soft_interest"):
-        get_supabase().table("meetings").insert({
-            "account_id": state["account_id"],
-            "status": meeting_status,
-            "proposed_times": [],
-        }).execute()
+        existing = (
+            get_supabase().table("meetings")
+            .select("id, status")
+            .eq("account_id", state["account_id"])
+            .neq("status", "cancelled")
+            .limit(1)
+            .execute()
+        )
+        if existing.data:
+            existing_status = existing.data[0]["status"]
+            # Never downgrade a confirmed meeting to soft_interest/proposed
+            if existing_status != "confirmed":
+                get_supabase().table("meetings").update({"status": meeting_status}).eq("id", existing.data[0]["id"]).execute()
+        else:
+            get_supabase().table("meetings").insert({
+                "account_id": state["account_id"],
+                "status": meeting_status,
+                "proposed_times": [],
+            }).execute()
 
     entry = {
         "node": "meeting_booker",
