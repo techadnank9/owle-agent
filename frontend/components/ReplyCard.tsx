@@ -47,7 +47,9 @@ export function ReplyCard({ replies }: { replies: Reply[] }) {
   const [sent, setSent] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [showOriginal, setShowOriginal] = useState(false);
-  const alreadyBooked = latest.outreach_actions?.accounts?.status === "meeting_booked";
+  const alreadyBooked = ["meeting_booked", "customer", "churned", "nurture"].includes(
+    latest.outreach_actions?.accounts?.status ?? ""
+  );
   const [booking, setBooking] = useState(false);
   const [booked, setBooked] = useState(alreadyBooked);
   const [meetLink, setMeetLink] = useState<string | null>(null);

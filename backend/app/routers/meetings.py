@@ -1,8 +1,13 @@
 import logging
+from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from ..supabase_client import get_supabase, create_outreach_action
 from ..claude import call_claude
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat()
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -28,14 +33,14 @@ def book_meeting(body: BookMeetingRequest):
         meeting_id = existing.data[0]["id"]
         supabase.table("meetings").update({
             "status": "confirmed",
-            "confirmed_at": "now()",
+            "confirmed_at": _now(),
             "proposed_times": [body.proposed_time],
         }).eq("id", meeting_id).execute()
     else:
         res = supabase.table("meetings").insert({
             "account_id": body.account_id,
             "status": "confirmed",
-            "confirmed_at": "now()",
+            "confirmed_at": _now(),
             "proposed_times": [body.proposed_time],
         }).execute()
         meeting_id = res.data[0]["id"] if res.data else None
@@ -138,7 +143,7 @@ def confirm_meeting(meeting_id: str):
     meeting = result.data[0]
     supabase.table("meetings").update({
         "status": "confirmed",
-        "confirmed_at": "now()",
+        "confirmed_at": _now(),
     }).eq("id", meeting_id).execute()
 
     supabase.table("accounts").update({"status": "meeting_booked"}).eq("id", meeting["account_id"]).execute()
@@ -179,7 +184,7 @@ def complete_meeting(meeting_id: str, body: CompleteRequest):
     account_status_map = {"won": "customer", "lost": "churned", "nurture": "nurture"}
     supabase.table("meetings").update({
         "status": "completed",
-        "completed_at": "now()",
+        "completed_at": _now(),
         "outcome": body.outcome,
         "notes": body.notes or None,
     }).eq("id", meeting_id).execute()

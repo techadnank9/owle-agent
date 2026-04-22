@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional
@@ -82,7 +83,7 @@ def send_outreach(outreach_id: str, body: SendRequest = SendRequest()):
 
     supabase.table("outreach_actions").update({
         "status": "sent",
-        "sent_at": "now()",
+        "sent_at": datetime.now(timezone.utc).isoformat(),
         "gmail_thread_id": thread_id,  # AgentMail thread_id — used by reply webhook to match incoming replies
     }).eq("id", outreach_id).execute()
 
