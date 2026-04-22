@@ -19,6 +19,7 @@ dependencies = [
     "python-multipart>=0.0.9",
     "tavily-python>=0.3.0",
     "apify-client>=1.7.0",
+    "agentmail>=0.1.0",
 ]
 
 [project.optional-dependencies]
