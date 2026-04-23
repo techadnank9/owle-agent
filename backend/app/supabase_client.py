@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from supabase import create_client, Client
 from .config import settings
 
@@ -11,6 +12,13 @@ def get_supabase() -> Client:
     return _client
 
 
+_NODE_ORDER = [
+    "account_selector", "web_enricher", "stakeholder_mapper",
+    "strategy_decider", "outreach_generator",
+    "reply_classifier", "meeting_booker", "learning_updater",
+]
+
+
 def write_audit_log(
     account_id: str,
     agent_run_id: str,
@@ -20,15 +28,56 @@ def write_audit_log(
     verified_facts: dict,
     inferred_assumptions: dict,
 ) -> None:
-    get_supabase().table("audit_log").insert({
-        "account_id": account_id,
-        "agent_run_id": agent_run_id,
-        "node": node,
+    supabase = get_supabase()
+    node_data = {
         "action": action,
-        "rationale": rationale,
-        "verified_facts": verified_facts,
-        "inferred_assumptions": inferred_assumptions,
-    }).execute()
+        "rationale": rationale or "",
+        "verified_facts": verified_facts or {},
+        "inferred_assumptions": inferred_assumptions or {},
+    }
+
+    existing = supabase.table("audit_log") \
+        .select("id, nodes, verified_facts, inferred_assumptions") \
+        .eq("agent_run_id", str(agent_run_id)) \
+        .limit(1).execute()
+
+    if existing.data:
+        row = existing.data[0]
+        nodes: dict = row.get("nodes") or {}
+        nodes[node] = node_data
+
+        # Merge facts/assumptions across all nodes
+        merged_facts: dict = {}
+        merged_assumptions: dict = {}
+        for nd in nodes.values():
+            merged_facts.update(nd.get("verified_facts") or {})
+            merged_assumptions.update(nd.get("inferred_assumptions") or {})
+
+        # Build ordered action summary
+        ordered = [nodes[n]["action"] for n in _NODE_ORDER if n in nodes]
+        remaining = [v["action"] for k, v in nodes.items() if k not in _NODE_ORDER]
+        action_summary = " → ".join(ordered + remaining) or action
+
+        supabase.table("audit_log").update({
+            "nodes": nodes,
+            "node": node,
+            "action": action_summary,
+            "rationale": rationale,
+            "verified_facts": merged_facts,
+            "inferred_assumptions": merged_assumptions,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }).eq("id", row["id"]).execute()
+    else:
+        supabase.table("audit_log").insert({
+            "account_id": account_id,
+            "agent_run_id": agent_run_id,
+            "node": node,
+            "action": action,
+            "rationale": rationale,
+            "verified_facts": verified_facts or {},
+            "inferred_assumptions": inferred_assumptions or {},
+            "nodes": {node: node_data},
+        }).execute()
 
 
 def update_account(account_id: str, updates: dict) -> None:

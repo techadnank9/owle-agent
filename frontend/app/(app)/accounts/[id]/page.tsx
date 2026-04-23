@@ -5,6 +5,13 @@ import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { enrichAccount } from "@/lib/api";
 
+type NodeData = {
+  action: string;
+  rationale: string;
+  verified_facts: Record<string, unknown>;
+  inferred_assumptions: Record<string, unknown>;
+};
+
 type AuditEntry = {
   id: string;
   agent_run_id: string;
@@ -13,7 +20,9 @@ type AuditEntry = {
   rationale: string;
   verified_facts: Record<string, unknown>;
   inferred_assumptions: Record<string, unknown>;
+  nodes: Record<string, NodeData>;
   created_at: string;
+  updated_at: string | null;
 };
 
 type Account = {
@@ -47,62 +56,142 @@ function statusColor(status: string) {
   return map[status] ?? "text-gray-400";
 }
 
-function AuditEntryCard({ entry, defaultOpen }: { entry: AuditEntry; defaultOpen: boolean }) {
+const NODE_ORDER_LIST = [
+  "account_selector","web_enricher","stakeholder_mapper",
+  "strategy_decider","outreach_generator",
+  "reply_classifier","meeting_booker","learning_updater",
+];
+
+function NodeTimeline({ nodeName, data, isLast }: { nodeName: string; data: NodeData; isLast: boolean }) {
+  const [open, setOpen] = useState(false);
+  const hasDetails = !!(data.rationale?.trim()) ||
+    Object.keys(data.verified_facts || {}).length > 0 ||
+    Object.keys(data.inferred_assumptions || {}).length > 0;
+
+  return (
+    <div className="flex gap-3">
+      <div className="flex flex-col items-center pt-2.5 shrink-0">
+        <span className="w-2 h-2 rounded-full bg-gray-300 shrink-0" />
+        {!isLast && <span className="w-px flex-1 bg-gray-100 mt-1" />}
+      </div>
+      <div className={`flex-1 ${isLast ? "pb-1" : "pb-3"}`}>
+        <button
+          className="w-full text-left flex items-start gap-2 group"
+          onClick={() => hasDetails && setOpen(o => !o)}
+        >
+          <span className="text-xs font-medium bg-gray-100 px-2 py-0.5 rounded text-gray-600 shrink-0 mt-0.5">
+            {NODE_LABELS[nodeName] ?? nodeName}
+          </span>
+          <span className="text-sm text-gray-700 flex-1 leading-snug">{data.action}</span>
+          {hasDetails && (
+            <span className="text-gray-300 text-xs shrink-0 mt-1">{open ? "▲" : "▼"}</span>
+          )}
+        </button>
+
+        {open && (
+          <div className="mt-2 pl-1 flex flex-col gap-2">
+            {data.rationale?.trim() && (
+              <p className="text-xs text-gray-500 leading-relaxed">{data.rationale}</p>
+            )}
+            {Object.keys(data.verified_facts || {}).length > 0 && (
+              <div>
+                <p className="text-[10px] font-semibold text-green-600 uppercase tracking-wide mb-1">Verified Facts</p>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
+                  {Object.entries(data.verified_facts).map(([k, v]) => (
+                    <div key={k} className="flex gap-1 text-xs text-gray-500">
+                      <span className="text-green-400 shrink-0">✓</span>
+                      <span><span className="text-gray-600">{k}:</span> {String(v)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {Object.keys(data.inferred_assumptions || {}).length > 0 && (
+              <div>
+                <p className="text-[10px] font-semibold text-amber-500 uppercase tracking-wide mb-1">Assumptions</p>
+                <div className="flex flex-col gap-0.5">
+                  {Object.entries(data.inferred_assumptions).map(([k, v]) => (
+                    <div key={k} className="flex gap-1 text-xs text-gray-500">
+                      <span className="text-amber-300 shrink-0">~</span>
+                      <span><span className="text-gray-600">{k}:</span> {String(v)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function AuditRunCard({ entries, defaultOpen }: { entries: AuditEntry[]; defaultOpen: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
-  const hasDetails = (entry.rationale && entry.rationale.trim()) ||
-    (entry.verified_facts && Object.keys(entry.verified_facts).length > 0) ||
-    (entry.inferred_assumptions && Object.keys(entry.inferred_assumptions).length > 0);
+  const primary = entries[0];
+  const hasNodes = primary.nodes && Object.keys(primary.nodes).length > 0;
+
+  const sortedNodes = hasNodes
+    ? Object.entries(primary.nodes).sort(([a], [b]) => {
+        const ai = NODE_ORDER_LIST.indexOf(a);
+        const bi = NODE_ORDER_LIST.indexOf(b);
+        return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+      })
+    : [];
+
+  const updatedAt = primary.updated_at ?? primary.created_at;
 
   return (
     <div className="border rounded-lg overflow-hidden">
       <button
-        className="w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-gray-50 transition-colors"
-        onClick={() => hasDetails && setOpen(o => !o)}
+        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors"
+        onClick={() => setOpen(o => !o)}
       >
-        <span className="text-xs font-medium bg-gray-100 px-2 py-0.5 rounded text-gray-600 shrink-0">
-          {NODE_LABELS[entry.node] ?? entry.node}
+        <span className="text-xs text-gray-400 shrink-0" suppressHydrationWarning>
+          {new Date(primary.created_at).toLocaleString()}
         </span>
-        <span className="text-sm text-gray-700 flex-1 truncate">{entry.action}</span>
-        <span className="text-xs text-gray-400 shrink-0" suppressHydrationWarning>{new Date(entry.created_at).toLocaleTimeString()}</span>
-        {hasDetails && <span className="text-gray-300 text-xs shrink-0">{open ? "▲" : "▼"}</span>}
+        {hasNodes && (
+          <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full shrink-0">
+            {sortedNodes.length} nodes
+          </span>
+        )}
+        <span className="flex-1 text-xs text-gray-400 truncate">
+          {hasNodes
+            ? sortedNodes.map(([n]) => NODE_LABELS[n] ?? n).join(" → ")
+            : primary.action}
+        </span>
+        <span className="text-gray-300 text-xs shrink-0">{open ? "▲" : "▼"}</span>
       </button>
 
-      {open && hasDetails && (
-        <div className="px-4 pb-4 bg-white border-t flex flex-col gap-3">
-          {entry.rationale && (
-            <ul className="flex flex-col gap-1.5 pt-3">
-              {entry.rationale.split(/(?<=[.!?])\s+(?=[A-Z])/).map(s => s.trim()).filter(Boolean).map((point, i) => (
-                <li key={i} className="flex gap-2 text-xs text-gray-500">
-                  <span className="text-gray-300 mt-0.5 shrink-0">▸</span>
-                  <span>{point}</span>
-                </li>
+      {open && (
+        <div className="border-t bg-white px-4 py-3">
+          {hasNodes ? (
+            <div>
+              {sortedNodes.map(([nodeName, data], idx) => (
+                <NodeTimeline
+                  key={nodeName}
+                  nodeName={nodeName}
+                  data={data}
+                  isLast={idx === sortedNodes.length - 1}
+                />
               ))}
-            </ul>
-          )}
-          {entry.verified_facts && Object.keys(entry.verified_facts).length > 0 && (
-            <div className="pt-2 border-t">
-              <p className="text-xs font-medium text-green-600 mb-1.5">Verified Facts</p>
-              <div className="grid grid-cols-2 gap-x-6 gap-y-1">
-                {Object.entries(entry.verified_facts).map(([k, v]) => (
-                  <div key={k} className="flex gap-1.5 text-xs text-gray-500">
-                    <span className="text-green-400 shrink-0">✓</span>
-                    <span><span className="text-gray-600">{k}:</span> {String(v)}</span>
-                  </div>
-                ))}
-              </div>
+              {primary.updated_at && primary.updated_at !== primary.created_at && (
+                <p className="text-[10px] text-gray-300 mt-2" suppressHydrationWarning>
+                  Last updated {new Date(updatedAt).toLocaleString()}
+                </p>
+              )}
             </div>
-          )}
-          {entry.inferred_assumptions && Object.keys(entry.inferred_assumptions).length > 0 && (
-            <div className="pt-2 border-t">
-              <p className="text-xs font-medium text-amber-500 mb-1.5">Inferred Assumptions</p>
-              <div className="flex flex-col gap-1">
-                {Object.entries(entry.inferred_assumptions).map(([k, v]) => (
-                  <div key={k} className="flex gap-1.5 text-xs text-gray-500">
-                    <span className="text-amber-300 shrink-0">~</span>
-                    <span><span className="text-gray-600">{k}:</span> {String(v)}</span>
-                  </div>
-                ))}
-              </div>
+          ) : (
+            // Backward compat: old multi-row format
+            <div className="flex flex-col gap-1.5">
+              {entries.map(entry => (
+                <div key={entry.id} className="flex items-start gap-2 py-1.5 border-b last:border-0">
+                  <span className="text-xs font-medium bg-gray-100 px-2 py-0.5 rounded text-gray-600 shrink-0">
+                    {NODE_LABELS[entry.node] ?? entry.node}
+                  </span>
+                  <span className="text-sm text-gray-700 flex-1">{entry.action}</span>
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -412,22 +501,10 @@ export default function AccountDetailPage({ params }: { params: Promise<{ id: st
         {auditLog.length === 0 ? (
           <p className="text-sm text-gray-400">No audit entries yet.</p>
         ) : (
-          <div className="flex flex-col gap-4">
-            {/* Latest run */}
+          <div className="flex flex-col gap-3">
             {latestRun && (
-              <div>
-                <p className="text-xs text-gray-400 mb-2">
-                  Latest run · {new Date(latestRun[1][0].created_at).toLocaleString()}
-                </p>
-                <div className="flex flex-col gap-1.5">
-                  {latestRun[1].map((entry, i) => (
-                    <AuditEntryCard key={entry.id} entry={entry} defaultOpen={i === latestRun[1].length - 1} />
-                  ))}
-                </div>
-              </div>
+              <AuditRunCard entries={latestRun[1]} defaultOpen={true} />
             )}
-
-            {/* Older runs collapsed */}
             {olderRuns.length > 0 && (
               <div>
                 <button
@@ -436,18 +513,13 @@ export default function AccountDetailPage({ params }: { params: Promise<{ id: st
                 >
                   {showOldRuns ? "Hide" : "Show"} {olderRuns.length} older run{olderRuns.length > 1 ? "s" : ""}
                 </button>
-                {showOldRuns && olderRuns.map(([runId, entries]) => (
-                  <div key={runId} className="mb-4">
-                    <p className="text-xs text-gray-300 mb-2">
-                      Run · {new Date(entries[0].created_at).toLocaleString()}
-                    </p>
-                    <div className="flex flex-col gap-1.5 opacity-60">
-                      {entries.map(entry => (
-                        <AuditEntryCard key={entry.id} entry={entry} defaultOpen={false} />
-                      ))}
-                    </div>
+                {showOldRuns && (
+                  <div className="flex flex-col gap-3 opacity-60">
+                    {olderRuns.map(([runId, entries]) => (
+                      <AuditRunCard key={runId} entries={entries} defaultOpen={false} />
+                    ))}
                   </div>
-                ))}
+                )}
               </div>
             )}
           </div>
