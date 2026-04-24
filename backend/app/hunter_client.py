@@ -32,7 +32,6 @@ def search_contacts(company_name: str) -> list[dict]:
             "company": company_name,
             "api_key": settings.hunter_api_key,
             "limit": 20,
-            "seniority": "senior,executive",
         },
         timeout=15,
     )

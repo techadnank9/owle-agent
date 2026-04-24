@@ -778,8 +778,10 @@ async def apollo_enrich(account_id: str, source: str = "all"):
             logger.warning("Apify search skipped for %s: %s", account["name"], e)
             errors.append(f"Apify: {e}")
 
-    if not people and errors:
-        raise HTTPException(status_code=502, detail="; ".join(errors))
+    # Only surface errors if nothing came back and a non-Apollo source failed
+    non_apollo_errors = [e for e in errors if not e.startswith("Apollo")]
+    if not people and non_apollo_errors:
+        raise HTTPException(status_code=502, detail="; ".join(non_apollo_errors))
 
     upserted = []
     for p in people:
