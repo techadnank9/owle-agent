@@ -729,18 +729,42 @@ async def apollo_enrich(account_id: str):
         raise HTTPException(status_code=404, detail="Account not found")
     account = acct_res.data[0]
 
+    people: list[dict] = []
+    sources_tried: list[str] = []
+    errors: list[str] = []
+
+    # Apollo
     try:
-        from ..apollo_client import search_contacts
-        people = search_contacts(account["name"], account.get("location"))
-    except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
+        from ..apollo_client import search_contacts as apollo_search
+        apollo_people = apollo_search(account["name"], account.get("location"))
+        for p in apollo_people:
+            p["source"] = "apollo"
+        people.extend(apollo_people)
+        sources_tried.append("apollo")
     except Exception as e:
-        logger.error("Apollo search failed for %s: %s", account["name"], e)
-        raise HTTPException(status_code=502, detail=f"Apollo API error: {e}")
+        logger.warning("Apollo search skipped for %s: %s", account["name"], e)
+        errors.append(f"Apollo: {e}")
+
+    # Hunter.io
+    try:
+        from ..hunter_client import search_contacts as hunter_search
+        hunter_people = hunter_search(account["name"])
+        # Deduplicate by email — skip if already found via Apollo
+        existing_emails = {p["email"] for p in people if p.get("email")}
+        for p in hunter_people:
+            if p.get("email") and p["email"] in existing_emails:
+                continue
+            people.append(p)
+        sources_tried.append("hunter")
+    except Exception as e:
+        logger.warning("Hunter search skipped for %s: %s", account["name"], e)
+        errors.append(f"Hunter: {e}")
+
+    if not people and errors:
+        raise HTTPException(status_code=502, detail="; ".join(errors))
 
     upserted = []
     for p in people:
-        # Check if contact already exists (by apollo_id in linkedin_url or by name+account)
         existing = (
             supabase.table("contacts")
             .select("id")
@@ -752,11 +776,11 @@ async def apollo_enrich(account_id: str):
         payload = {
             "account_id": account_id,
             "name": p["name"],
-            "title": p["title"],
-            "email": p["email"],
-            "linkedin_url": p["linkedin_url"],
-            "source": "apollo",
-            "confidence": 0.85,
+            "title": p.get("title", ""),
+            "email": p.get("email"),
+            "linkedin_url": p.get("linkedin_url"),
+            "source": p.get("source", "unknown"),
+            "confidence": 0.85 if p.get("source") == "apollo" else 0.75,
         }
         if existing.data:
             supabase.table("contacts").update(payload).eq("id", existing.data[0]["id"]).execute()
@@ -765,6 +789,9 @@ async def apollo_enrich(account_id: str):
             res = supabase.table("contacts").insert(payload).execute()
             upserted.append({**payload, "id": res.data[0]["id"] if res.data else None, "action": "created"})
 
-    return {"found": len(people), "upserted": len(upserted), "contacts": upserted}
-
-    return {"processed": len(results), "accounts": results}
+    return {
+        "found": len(people),
+        "upserted": len(upserted),
+        "sources": sources_tried,
+        "contacts": upserted,
+    }

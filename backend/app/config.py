@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     tavily_api_key: str = ""
     apify_api_key: str = ""
     apollo_api_key: str = ""
+    hunter_api_key: str = ""
     agentmail_api_key: str = ""
     backend_url: str = ""  # public URL for webhook registration, e.g. https://owle-backend.onrender.com
 
