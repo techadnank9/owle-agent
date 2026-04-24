@@ -115,6 +115,12 @@ export async function getCmsCities(state: string): Promise<{ cities: string[] }>
   return res.json();
 }
 
+export async function apolloEnrich(id: string): Promise<{ found: number; upserted: number; contacts: { name: string; title: string; email: string | null; linkedin_url: string | null }[] }> {
+  const res = await fetch(`${API}/accounts/${id}/apollo-enrich`, { method: "POST" });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 export async function enrichAccount(id: string) {
   const res = await fetch(`${API}/accounts/${id}/enrich`, { method: "POST" });
   if (!res.ok) throw new Error(await res.text());

@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { use } from "react";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
-import { enrichAccount } from "@/lib/api";
+import { enrichAccount, apolloEnrich } from "@/lib/api";
 
 type NodeData = {
   action: string;
@@ -206,6 +206,8 @@ export default function AccountDetailPage({ params }: { params: Promise<{ id: st
   const [auditLog, setAuditLog] = useState<AuditEntry[]>([]);
   const [enriching, setEnriching] = useState(false);
   const [enrichMsg, setEnrichMsg] = useState<string | null>(null);
+  const [apolloLoading, setApolloLoading] = useState(false);
+  const [apolloMsg, setApolloMsg] = useState<string | null>(null);
   const [showOldRuns, setShowOldRuns] = useState(false);
   const [contacts, setContacts] = useState<{id: string; name: string | null; title: string; email: string | null; linkedin_url: string | null; source: string; confidence: number | null}[]>([]);
   const [inferredOpen, setInferredOpen] = useState(false);
@@ -246,6 +248,25 @@ export default function AccountDetailPage({ params }: { params: Promise<{ id: st
     }
   }
 
+  async function handleApolloEnrich() {
+    setApolloLoading(true);
+    setApolloMsg(null);
+    try {
+      const res = await apolloEnrich(id);
+      if (res.found === 0) {
+        setApolloMsg("No matching contacts found on Apollo for this account.");
+      } else {
+        setApolloMsg(`✓ Found ${res.found} contact${res.found !== 1 ? "s" : ""}, ${res.upserted} saved.`);
+        loadData();
+      }
+    } catch (e: unknown) {
+      setApolloMsg(`Error: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setApolloLoading(false);
+      setTimeout(() => setApolloMsg(null), 6000);
+    }
+  }
+
   if (!account) return <p className="text-sm text-gray-400">Loading…</p>;
 
   // Group by agent_run_id, sorted newest first
@@ -281,12 +302,16 @@ export default function AccountDetailPage({ params }: { params: Promise<{ id: st
     if (raw.category) facilityRows.push({ label: "Category", value: raw.category });
     if (raw.rating) facilityRows.push({ label: "Google Rating", value: `★ ${raw.rating}${raw.reviews_count ? ` (${raw.reviews_count})` : ""}` });
     if (raw.email) facilityRows.push({ label: "Email", value: raw.email });
-    if (raw.bed_count) facilityRows.push({ label: "Beds (Apify)", value: String(raw.bed_count) });
+    if (raw.bed_count) facilityRows.push({ label: "Beds", value: String(raw.bed_count) });
     if (raw.ownership_type) facilityRows.push({ label: "Ownership", value: raw.ownership_type });
-    if (raw.cms_overall_rating) facilityRows.push({ label: "CMS Rating", value: `${raw.cms_overall_rating}/5` });
-    if (raw.cms_staffing_rating) facilityRows.push({ label: "CMS Staffing", value: `${raw.cms_staffing_rating}/5` });
+    if (raw.chain) facilityRows.push({ label: "Chain", value: raw.chain });
+    if (raw.ccn) facilityRows.push({ label: "CCN", value: raw.ccn });
+    if (raw.cms_overall_rating) facilityRows.push({ label: "CMS Rating", value: `${raw.cms_overall_rating}/5 ★` });
+    if (raw.cms_staffing_rating) facilityRows.push({ label: "CMS Staffing", value: `${raw.cms_staffing_rating}/5 ★` });
     if (raw.nursing_staff_turnover_pct) facilityRows.push({ label: "Nurse Turnover", value: `${raw.nursing_staff_turnover_pct}%` });
-    if (raw.cms_fines_count && raw.cms_fines_count !== "0") facilityRows.push({ label: "CMS Fines", value: `${raw.cms_fines_count} ($${raw.cms_fines_total_usd})` });
+    if (raw.rn_turnover_pct) facilityRows.push({ label: "RN Turnover", value: `${raw.rn_turnover_pct}%` });
+    const penaltyCount = raw.cms_total_penalties ?? raw.cms_fines_count;
+    if (penaltyCount && penaltyCount !== "0") facilityRows.push({ label: "Penalties", value: `${penaltyCount} penalties · $${raw.cms_fines_total_usd ?? 0}` });
     if (raw.parent_organization) facilityRows.push({ label: "Parent Org", value: raw.parent_organization });
     if (raw.contact_email) facilityRows.push({ label: "Contact Email", value: raw.contact_email });
     if (raw.contact_phone) facilityRows.push({ label: "Contact Phone", value: raw.contact_phone });
@@ -326,19 +351,34 @@ export default function AccountDetailPage({ params }: { params: Promise<{ id: st
             <Button variant="outline" size="sm" onClick={handleEnrich} disabled={enriching}>
               {enriching ? "Running…" : "Enrich & Re-score"}
             </Button>
+            <Button variant="outline" size="sm" onClick={handleApolloEnrich} disabled={apolloLoading}
+              className="border-purple-200 text-purple-700 hover:bg-purple-50">
+              {apolloLoading ? "Searching…" : "Find Contacts (Apollo)"}
+            </Button>
           </div>
         </div>
         {enrichMsg && <p className="text-xs text-gray-500 mb-3">{enrichMsg}</p>}
+        {apolloMsg && <p className="text-xs text-purple-600 mb-3">{apolloMsg}</p>}
 
         {/* Scores */}
         <div className="flex gap-6 text-sm mb-4">
           <div>
             <p className="text-xs text-gray-400 mb-0.5">ICP Score</p>
-            <p className="text-2xl font-bold text-gray-900">{account.icp_score != null ? Math.round(account.icp_score) : "—"}</p>
+            {account.icp_score != null
+              ? <p className="text-2xl font-bold text-gray-900">{Math.round(account.icp_score)}</p>
+              : account.status === "new"
+                ? <p className="text-sm text-gray-400 mt-1">Pending…</p>
+                : <p className="text-2xl font-bold text-gray-400">—</p>
+            }
           </div>
           <div>
             <p className="text-xs text-gray-400 mb-0.5">Priority Score</p>
-            <p className="text-2xl font-bold text-gray-900">{account.priority_score != null ? Math.round(account.priority_score) : "—"}</p>
+            {account.priority_score != null
+              ? <p className="text-2xl font-bold text-gray-900">{Math.round(account.priority_score)}</p>
+              : account.status === "new"
+                ? <p className="text-sm text-gray-400 mt-1">Pending…</p>
+                : <p className="text-2xl font-bold text-gray-400">—</p>
+            }
           </div>
         </div>
 
@@ -453,7 +493,7 @@ export default function AccountDetailPage({ params }: { params: Promise<{ id: st
         )}
 
         {contacts.length === 0 && linkedinProfiles.length === 0 && !raw?.contact_email && (
-          <p className="text-sm text-gray-400">No contacts yet — click <strong>Enrich & Re-score</strong> to find emails and LinkedIn profiles.</p>
+          <p className="text-sm text-gray-400">No contacts yet — click <strong>Find Contacts (Apollo)</strong> to search for administrators, nurse managers, and directors of nursing, or <strong>Enrich & Re-score</strong> to pull LinkedIn profiles.</p>
         )}
       </div>
 

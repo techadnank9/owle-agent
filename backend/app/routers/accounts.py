@@ -1,5 +1,6 @@
 import csv
 import io
+import logging
 import uuid
 from typing import List, Optional
 from fastapi import APIRouter, UploadFile, File, Request, HTTPException, Query, BackgroundTasks
@@ -10,6 +11,7 @@ from ..agents.graph import build_outreach_graph, build_enrich_graph
 from ..config import settings
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 class EmailEntry(BaseModel):
@@ -66,7 +68,8 @@ def _run_enrich_for_account(checkpointer, account_id: str, agent_run_id: str, ac
 
 @router.post("/{account_id}/enrich")
 async def enrich_account(account_id: str, request: Request, background_tasks: BackgroundTasks):
-    """Re-run CMS enrichment + re-score only (no outreach regeneration)."""
+    """Re-run enrichment pipeline. Runs full pipeline (contacts + outreach) if no drafts exist yet,
+    otherwise runs enrich-only (re-score without overwriting existing outreach)."""
     supabase = get_supabase()
     result = supabase.table("accounts").select("*").eq("id", account_id).single().execute()
     if not result.data:
@@ -77,6 +80,10 @@ async def enrich_account(account_id: str, request: Request, background_tasks: Ba
     account_data["name"] = account_data.get("name") or account.get("name", "")
     account_data["location"] = account_data.get("location") or account.get("location") or ""
 
+    # Check if account already has outreach drafts — if so, enrich-only to avoid overwriting
+    existing_outreach = supabase.table("outreach_actions").select("id").eq("account_id", account_id).limit(1).execute()
+    has_outreach = bool(existing_outreach.data)
+
     thread_id = str(uuid.uuid4())
     run_result = supabase.table("agent_runs").insert({
         "account_id": account_id,
@@ -86,17 +93,28 @@ async def enrich_account(account_id: str, request: Request, background_tasks: Ba
     }).execute()
     agent_run_id = run_result.data[0]["id"]
 
-    background_tasks.add_task(
-        _run_enrich_for_account,
-        request.app.state.checkpointer,
-        account_id,
-        agent_run_id,
-        account_data,
-        thread_id,
-    )
+    if has_outreach:
+        background_tasks.add_task(
+            _run_enrich_for_account,
+            request.app.state.checkpointer,
+            account_id,
+            agent_run_id,
+            account_data,
+            thread_id,
+        )
+        message = "Re-enrichment and re-scoring started (outreach drafts preserved)."
+    else:
+        background_tasks.add_task(
+            _run_agent_for_account,
+            request.app.state.checkpointer,
+            account_id,
+            agent_run_id,
+            account_data,
+            thread_id,
+        )
+        message = "Full pipeline started — contacts and outreach drafts will be generated."
 
-    return {"status": "queued", "agent_run_id": agent_run_id, "thread_id": thread_id,
-            "message": "Re-enrichment and re-scoring started in background."}
+    return {"status": "queued", "agent_run_id": agent_run_id, "thread_id": thread_id, "message": message}
 
 
 @router.get("/")
@@ -210,6 +228,17 @@ class FacilityImport(BaseModel):
     phone: str | None = None
     website: str | None = None
     place_id: str | None = None
+    # CMS fields — populated when importing from CMS search
+    beds: int | None = None
+    stars: int | None = None
+    staffing_stars: int | None = None
+    nurse_turnover_pct: float | None = None
+    rn_turnover_pct: float | None = None
+    penalties: int | None = None
+    fines_usd: float | None = None
+    ownership: str | None = None
+    chain: str | None = None
+    ccn: str | None = None
 
 
 class BulkImportRequest(BaseModel):
@@ -283,6 +312,7 @@ async def cms_search_snfs(
     min_beds: int = Query(100, ge=0),
     sort_by: str = Query("priority", description="priority|turnover|rn_turnover|penalties|stars|beds"),
     max_results: int = Query(50, ge=1, le=200),
+    ownership: Optional[str] = Query(None, description="for_profit|non_profit|government"),
 ):
     """Search CMS Care Compare for SNFs with pain signals (turnover, penalties, low stars)."""
     import httpx
@@ -306,15 +336,27 @@ async def cms_search_snfs(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"CMS API error: {e}")
 
-    # Filter by bed count
+    # Filter by bed count and ownership
+    ownership_map = {
+        "for_profit": "for profit",
+        "non_profit": "non profit",
+        "government": "government",
+    }
+    ownership_filter = ownership_map.get(ownership.lower() if ownership else "", None)
+
     filtered = []
     for rec in results:
         try:
             beds = int(float(rec.get("number_of_certified_beds") or 0))
         except (ValueError, TypeError):
             beds = 0
-        if beds >= min_beds:
-            filtered.append(rec)
+        if beds < min_beds:
+            continue
+        if ownership_filter:
+            rec_ownership = (rec.get("ownership_type") or "").lower()
+            if not rec_ownership.startswith(ownership_filter):
+                continue
+        filtered.append(rec)
 
     # Sort
     sort_key_map = {
@@ -380,6 +422,32 @@ async def cms_search_snfs(
         })
 
     return {"state": state, "city": city, "min_beds": min_beds, "count": len(output), "results": output}
+
+
+@router.get("/cms-cities")
+async def get_cms_cities(state: str = Query(..., description="US state abbreviation e.g. 'CA'")):
+    """Return sorted list of cities that have SNF records in CMS for given state."""
+    import httpx
+
+    params = {
+        "limit": 1000,
+        "offset": 0,
+        "conditions[0][property]": "state",
+        "conditions[0][value]": state.upper(),
+        "conditions[0][operator]": "=",
+    }
+    try:
+        r = httpx.get(CMS_API, params=params, timeout=15, headers={"User-Agent": "owle-agent/1.0"})
+        results = r.json().get("results", [])
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"CMS API error: {e}")
+
+    cities = sorted(set(
+        (rec.get("citytown") or "").title()
+        for rec in results
+        if rec.get("citytown")
+    ))
+    return {"state": state, "cities": cities}
 
 
 @router.get("/search")
@@ -504,6 +572,30 @@ async def bulk_import(request: Request, background_tasks: BackgroundTasks, body:
         if facility.website:
             account_data["website"] = facility.website
 
+        # Carry CMS quality data through using same key names as _parse_cms_record
+        # so web_enricher_node can skip the API re-lookup
+        if facility.beds:
+            account_data["bed_count"] = facility.beds
+            account_data["cms_matched"] = True
+        if facility.stars is not None:
+            account_data["cms_overall_rating"] = str(facility.stars)
+        if facility.staffing_stars is not None:
+            account_data["cms_staffing_rating"] = str(facility.staffing_stars)
+        if facility.nurse_turnover_pct is not None:
+            account_data["nursing_staff_turnover_pct"] = str(facility.nurse_turnover_pct)
+        if facility.rn_turnover_pct is not None:
+            account_data["rn_turnover_pct"] = str(facility.rn_turnover_pct)
+        if facility.penalties is not None:
+            account_data["cms_total_penalties"] = str(facility.penalties)
+        if facility.fines_usd is not None:
+            account_data["cms_fines_total_usd"] = str(facility.fines_usd)
+        if facility.ownership:
+            account_data["ownership_type"] = facility.ownership
+        if facility.chain:
+            account_data["chain"] = facility.chain
+        if facility.ccn:
+            account_data["ccn"] = facility.ccn
+
         acc_insert: dict = {
             "name": facility.name,
             "type": "skilled_nursing_facility",
@@ -512,6 +604,8 @@ async def bulk_import(request: Request, background_tasks: BackgroundTasks, body:
         }
         if location:
             acc_insert["location"] = location
+        if facility.beds:
+            acc_insert["bed_count"] = facility.beds
 
         acc_result = supabase.table("accounts").insert(acc_insert).execute()
         account_id = acc_result.data[0]["id"]
@@ -622,5 +716,55 @@ async def add_emails(request: Request, body: PasteEmailsRequest):
         except Exception as e:
             supabase.table("agent_runs").update({"status": "failed"}).eq("id", agent_run_id).execute()
             results.append({"account_id": account_id, "email": email, "error": str(e)})
+
+    return {"processed": len(results), "accounts": results}
+
+
+@router.post("/{account_id}/apollo-enrich")
+async def apollo_enrich(account_id: str):
+    supabase = get_supabase()
+
+    acct_res = supabase.table("accounts").select("id, name, location").eq("id", account_id).limit(1).execute()
+    if not acct_res.data:
+        raise HTTPException(status_code=404, detail="Account not found")
+    account = acct_res.data[0]
+
+    try:
+        from ..apollo_client import search_contacts
+        people = search_contacts(account["name"], account.get("location"))
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        logger.error("Apollo search failed for %s: %s", account["name"], e)
+        raise HTTPException(status_code=502, detail=f"Apollo API error: {e}")
+
+    upserted = []
+    for p in people:
+        # Check if contact already exists (by apollo_id in linkedin_url or by name+account)
+        existing = (
+            supabase.table("contacts")
+            .select("id")
+            .eq("account_id", account_id)
+            .eq("name", p["name"])
+            .limit(1)
+            .execute()
+        )
+        payload = {
+            "account_id": account_id,
+            "name": p["name"],
+            "title": p["title"],
+            "email": p["email"],
+            "linkedin_url": p["linkedin_url"],
+            "source": "apollo",
+            "confidence": 0.85,
+        }
+        if existing.data:
+            supabase.table("contacts").update(payload).eq("id", existing.data[0]["id"]).execute()
+            upserted.append({**payload, "id": existing.data[0]["id"], "action": "updated"})
+        else:
+            res = supabase.table("contacts").insert(payload).execute()
+            upserted.append({**payload, "id": res.data[0]["id"] if res.data else None, "action": "created"})
+
+    return {"found": len(people), "upserted": len(upserted), "contacts": upserted}
 
     return {"processed": len(results), "accounts": results}
