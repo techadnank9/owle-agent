@@ -220,7 +220,7 @@ const TOOLS = [
     owle_cost: "~$49–59/mo",
     api_tier: "Basic = People Search API. Custom = full advanced API.",
     credits: "2,500 credits/mo (30k/yr)",
-    note: "Free plan returns 403 on all API endpoints. Basic fixes this. Pricing page is JS-rendered — prices unconfirmed from official source.",
+    note: "Free plan returns 403 on all API endpoints. Basic fixes this. Prices confirmed from Apollo's live pricing page (April 2026).",
   },
   {
     name: "Apify",
@@ -324,7 +324,7 @@ const PLATFORMS: Platform[] = [
     pros: [
       "Largest database — 275M+ contacts, 73M+ companies",
       "All-in-one: prospecting + outreach + analytics in one place",
-      "Generous free plan (50 credits/mo)",
+      "Free plan: 900 credits/year (~75/mo) — good for testing UI, no API access",
       "Built-in AI email writing + A/B testing",
       "Strong CRM integrations (Salesforce, HubSpot, Outreach)",
       "LinkedIn Chrome extension for real-time enrichment",
@@ -733,7 +733,7 @@ export default function PlatformsPage() {
             <div className="flex flex-col gap-1.5 mt-1">
               {[
                 { tool: "Hunter.io Starter", gives: "Up to 2,000 emails/mo via domain search", quality: "High — verified", color: "text-green-700 bg-green-50", badge: "best" },
-                { tool: "Apollo Basic", gives: "Up to 1,000 emails/mo from 275M database", quality: "High — verified", color: "text-green-700 bg-green-50", badge: "good" },
+                { tool: "Apollo Basic", gives: "2,500 credits/mo (30k/year) from 275M database — 1 credit = 1 email, 250/day send cap", quality: "High — verified", color: "text-green-700 bg-green-50", badge: "good" },
                 { tool: "Apify Starter", gives: "Scraped emails from company domain", quality: "Medium — unverified", color: "text-yellow-700 bg-yellow-50", badge: "fallback" },
                 { tool: "Snov.io Starter", gives: "Up to 1,000 emails/mo", quality: "High — verified", color: "text-green-700 bg-green-50", badge: "" },
               ].map(r => (
