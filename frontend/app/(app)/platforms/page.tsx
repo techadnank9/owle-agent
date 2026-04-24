@@ -171,6 +171,47 @@ const PHASES = [
       },
     ],
   },
+  {
+    id: 4,
+    label: "Phase 4 — Multi-Channel at Scale",
+    sublabel: "LinkedIn + high-volume email · 1,000+ leads/mo",
+    color: "purple",
+    total: "~$544–644/mo",
+    items: [
+      {
+        service: "Everything in Phase 3",
+        plan: "",
+        cost: "~$368–468/mo",
+        status: "carry" as const,
+        why: "All Phase 3 services continue at full scale.",
+      },
+      {
+        service: "HeyReach",
+        plan: "Growth",
+        cost: "$79/seat/mo",
+        status: "buy-now" as const,
+        why: "LinkedIn outreach automation alongside email. Sends connection requests, messages, and follows on LinkedIn — a second channel that reaches contacts who never open email. Unlimited campaigns, unified inbox, integrates with your existing Apollo/Hunter data. Annual plan drops to $59/seat/mo.",
+        link: "https://www.heyreach.io/pricing",
+        note: "HeyReach handles LinkedIn-side outreach. Owle handles email-side. Together they give you full multichannel coverage — email + LinkedIn — on the same account simultaneously.",
+      },
+      {
+        service: "Instantly.ai",
+        plan: "Outreach — Hypergrowth",
+        cost: "$97/mo",
+        status: "buy-now" as const,
+        why: "Gmail API caps at ~500 sends/day on a standard account. At 1,000+ leads/mo you hit that ceiling. Instantly gives you unlimited email accounts + warmup + 100,000 emails/mo — your sending infrastructure scales without hitting Google quotas.",
+        link: "https://instantly.ai/pricing",
+        note: "⚠ Outreach ($97/mo) and Credits ($47/mo) are separate Instantly products. At Phase 4 you already have Hunter + Apollo for contact data — you only need the Outreach plan for sending infrastructure. Skip Credits unless you want Instantly's database instead of Apollo.",
+      },
+      {
+        service: "Anthropic",
+        plan: "Pay-as-you-go",
+        cost: "~$100–200/mo",
+        status: "scales" as const,
+        why: "Full pipeline at 1,000+ accounts/mo across both email and LinkedIn channels.",
+      },
+    ],
+  },
 ];
 
 const STATUS_STYLE: Record<string, string> = {
@@ -197,6 +238,7 @@ const PHASE_HEADER: Record<string, string> = {
   blue:   "bg-blue-600",
   indigo: "bg-indigo-600",
   violet: "bg-violet-600",
+  purple: "bg-purple-600",
 };
 
 // ─── Tool reference data ──────────────────────────────────────────────────────
