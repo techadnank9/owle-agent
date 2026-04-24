@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { use } from "react";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
@@ -207,6 +207,7 @@ export default function AccountDetailPage({ params }: { params: Promise<{ id: st
   const [enriching, setEnriching] = useState(false);
   const [enrichMsg, setEnrichMsg] = useState<string | null>(null);
   const [contactLoading, setContactLoading] = useState<"apollo" | "hunter" | "apify" | null>(null);
+  const contactLoadingRef = useRef(false);
   const [apolloMsg, setApolloMsg] = useState<string | null>(null);
   const [showOldRuns, setShowOldRuns] = useState(false);
   const [contacts, setContacts] = useState<{id: string; name: string | null; title: string; email: string | null; linkedin_url: string | null; source: string; confidence: number | null}[]>([]);
@@ -251,6 +252,8 @@ export default function AccountDetailPage({ params }: { params: Promise<{ id: st
   }
 
   async function handleContactSearch(source: "apollo" | "hunter" | "apify") {
+    if (contactLoadingRef.current) return;
+    contactLoadingRef.current = true;
     setContactLoading(source);
     setApolloMsg(null);
     try {
@@ -264,6 +267,7 @@ export default function AccountDetailPage({ params }: { params: Promise<{ id: st
     } catch (e: unknown) {
       setApolloMsg(`${source} error: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
+      contactLoadingRef.current = false;
       setContactLoading(null);
       setTimeout(() => setApolloMsg(null), 8000);
     }
