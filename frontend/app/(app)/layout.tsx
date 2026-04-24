@@ -36,6 +36,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
         <SectionLabel>Insights</SectionLabel>
         <NavLink href="/analytics">Analytics</NavLink>
+        <NavLink href="/platforms">Platform Compare</NavLink>
         <NavLink href="/how-it-works">How It Works</NavLink>
         <div className="mt-auto pt-4 border-t">
           <button
