@@ -75,7 +75,7 @@ function extractTime(text: string): string | null {
 
 function stripQuoted(body: string): string {
   // Remove "On [date]... wrote:" block and everything after (Gmail/Outlook style)
-  const onWrote = body.search(/\r?\nOn .+wrote:\s*\r?\n/ms);
+  const onWrote = body.search(/\r?\nOn [\s\S]+wrote:\s*\r?\n/m);
   if (onWrote !== -1) return body.slice(0, onWrote).trim();
   // Fallback: strip lines starting with >
   const lines = body.split("\n");
