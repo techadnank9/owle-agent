@@ -781,6 +781,94 @@ export default function PlatformsPage() {
         </div>
       </div>
 
+      {/* ── Owle vs Direct ── */}
+      <div className="bg-white border rounded-xl overflow-hidden">
+        <div className="px-5 py-4 border-b bg-gray-50">
+          <h2 className="font-semibold text-gray-900">Owle vs. Using Apollo / Hunter Directly — Honest Comparison</h2>
+          <p className="text-xs text-gray-500 mt-0.5">Not trying to oversell — here's exactly what you get and don't get with each option</p>
+        </div>
+
+        {/* Feature matrix */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b bg-gray-50">
+                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Feature</th>
+                <th className="text-center px-4 py-3 text-xs font-medium text-gray-500">Apollo Basic<br/><span className="font-normal text-gray-400">$49/mo alone</span></th>
+                <th className="text-center px-4 py-3 text-xs font-medium text-gray-500">Hunter Starter<br/><span className="font-normal text-gray-400">$49/mo alone</span></th>
+                <th className="text-center px-4 py-3 text-xs font-medium text-blue-700 bg-blue-50 border-x border-blue-100">Owle — Phase 1<br/><span className="font-normal text-blue-400">~$66–76/mo</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                { feature: "Search 15,000+ SNFs with CMS quality signals (turnover, star rating, penalties)", apollo: false, hunter: false, owle: true },
+                { feature: "ICP scoring — AI ranks which SNFs are highest priority to contact", apollo: false, hunter: false, owle: true },
+                { feature: "Contact enrichment (find email + LinkedIn for decision-makers)", apollo: "Manual — search their UI", hunter: "Manual — search their UI", owle: "Automated via API on each account" },
+                { feature: "Personalized email drafts using facility-specific context", apollo: "Generic templates only", hunter: "Generic templates only", owle: "AI-written per facility (turnover, deficiencies, location)" },
+                { feature: "Outreach approval queue — review before sending", apollo: false, hunter: false, owle: true },
+                { feature: "Reply classification (interested / not a fit / needs info)", apollo: false, hunter: false, owle: true },
+                { feature: "Auto-draft responses to replies", apollo: false, hunter: false, owle: true },
+                { feature: "Meeting booking + Google Calendar + Meet link", apollo: false, hunter: false, owle: true },
+                { feature: "Deal pipeline (new → contacted → meeting → won/lost)", apollo: "Basic CRM export only", hunter: false, owle: true },
+                { feature: "Audit log — every action per account is traceable", apollo: false, hunter: false, owle: true },
+                { feature: "Email sending infrastructure", apollo: "✓ Included", hunter: "✓ Included (basic)", owle: "Gmail API (your own account)" },
+                { feature: "Database size", apollo: "275M contacts", hunter: "Domain-based only", owle: "Uses both via API" },
+              ].map((row, i) => (
+                <tr key={i} className="border-b last:border-0 align-top">
+                  <td className="px-4 py-2.5 text-xs text-gray-700 max-w-xs">{row.feature}</td>
+                  <td className="px-4 py-2.5 text-center text-xs">
+                    {row.apollo === false ? <span className="text-gray-300 font-medium">—</span> : row.apollo === true ? <span className="text-green-600 font-medium">✓</span> : <span className="text-gray-500">{row.apollo}</span>}
+                  </td>
+                  <td className="px-4 py-2.5 text-center text-xs">
+                    {row.hunter === false ? <span className="text-gray-300 font-medium">—</span> : row.hunter === true ? <span className="text-green-600 font-medium">✓</span> : <span className="text-gray-500">{row.hunter}</span>}
+                  </td>
+                  <td className="px-4 py-2.5 text-center text-xs bg-blue-50 border-x border-blue-100">
+                    {row.owle === false ? <span className="text-gray-300 font-medium">—</span> : row.owle === true ? <span className="text-green-600 font-semibold">✓</span> : <span className="text-blue-700 font-medium">{row.owle}</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* When to use each */}
+        <div className="grid grid-cols-3 divide-x border-t">
+          <div className="px-4 py-4">
+            <p className="text-xs font-semibold text-gray-700 mb-2">Use Apollo directly if:</p>
+            <ul className="flex flex-col gap-1.5 text-xs text-gray-600">
+              <li className="flex gap-1.5"><span className="text-gray-400 shrink-0 mt-0.5">→</span>You already have a list of companies and just need contact data</li>
+              <li className="flex gap-1.5"><span className="text-gray-400 shrink-0 mt-0.5">→</span>You want to write and send emails yourself manually</li>
+              <li className="flex gap-1.5"><span className="text-gray-400 shrink-0 mt-0.5">→</span>You don't need SNF-specific signals (turnover, star ratings)</li>
+              <li className="flex gap-1.5"><span className="text-gray-400 shrink-0 mt-0.5">→</span>You're comfortable with Apollo's UI for sequences</li>
+            </ul>
+          </div>
+          <div className="px-4 py-4">
+            <p className="text-xs font-semibold text-gray-700 mb-2">Use Hunter directly if:</p>
+            <ul className="flex flex-col gap-1.5 text-xs text-gray-600">
+              <li className="flex gap-1.5"><span className="text-gray-400 shrink-0 mt-0.5">→</span>You know the company domains and just need emails fast</li>
+              <li className="flex gap-1.5"><span className="text-gray-400 shrink-0 mt-0.5">→</span>You send low volume (&lt;200/mo) and manage it manually</li>
+              <li className="flex gap-1.5"><span className="text-gray-400 shrink-0 mt-0.5">→</span>You don't need AI personalization or reply handling</li>
+            </ul>
+            <div className="mt-3 bg-gray-50 rounded-lg px-3 py-2">
+              <p className="text-xs text-gray-500"><strong>Cost difference:</strong> Owle Phase 1 costs ~$17–27/mo more than Apollo or Hunter alone. That extra covers Render ($7) + Anthropic AI (~$10–20). The data source (Hunter) costs the same either way.</p>
+            </div>
+          </div>
+          <div className="px-4 py-4 bg-blue-50/50">
+            <p className="text-xs font-semibold text-blue-700 mb-2">Use Owle if:</p>
+            <ul className="flex flex-col gap-1.5 text-xs text-gray-600">
+              <li className="flex gap-1.5"><span className="text-blue-400 shrink-0 mt-0.5">→</span>You want to target SNFs specifically using CMS quality data</li>
+              <li className="flex gap-1.5"><span className="text-blue-400 shrink-0 mt-0.5">→</span>You want emails personalized per facility — not generic templates</li>
+              <li className="flex gap-1.5"><span className="text-blue-400 shrink-0 mt-0.5">→</span>You don't want to manually write, send, and follow up on every email</li>
+              <li className="flex gap-1.5"><span className="text-blue-400 shrink-0 mt-0.5">→</span>You want replies handled and meetings booked automatically</li>
+              <li className="flex gap-1.5"><span className="text-blue-400 shrink-0 mt-0.5">→</span>You want a full pipeline (not just a contact list)</li>
+            </ul>
+            <div className="mt-3 bg-blue-100/60 rounded-lg px-3 py-2">
+              <p className="text-xs text-blue-800"><strong>The real question:</strong> Apollo/Hunter give you a contact list. Owle turns that list into booked meetings — automatically.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* ── Individual APIs vs One Platform ── */}
       <div className="bg-white border rounded-xl overflow-hidden">
         <div className="px-5 py-4 border-b bg-gray-50">
