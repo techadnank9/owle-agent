@@ -251,10 +251,8 @@ export default function PlatformsPage() {
             <div className="flex flex-col gap-2 text-sm">
               {[
                 { s: "Render", p: "Starter", c: "$7/mo", note: "Keep backend always-on" },
-                { s: "Hunter.io", p: "Starter", c: "$49/mo", note: "Fixes enrichment — 2,000 searches/mo" },
+                { s: "Hunter.io", p: "Starter", c: "$49/mo", note: "Primary contact source — 2,000 domain searches/mo" },
                 { s: "Anthropic", p: "Pay-as-you-go", c: "~$10–20/mo", note: "ICP scoring + email drafts" },
-                { s: "Apify", p: "Free credit", c: "$0/mo", note: "Fallback email scraping" },
-                { s: "Apollo.io", p: "Skip for now", c: "$0/mo", note: "Web UI only — free plan 403s API" },
               ].map(r => (
                 <div key={r.s} className="flex justify-between items-start gap-2">
                   <div>
