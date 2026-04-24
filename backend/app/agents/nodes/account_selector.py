@@ -33,14 +33,61 @@ SCORE_ACCOUNT_TOOL = {
 def account_selector_node(state: AgentState) -> dict:
     account = state["account_data"]
 
+    # Deterministic CMS signal extraction for scoring context
+    cms_signals = []
+    try:
+        turnover = float(account.get("nursing_staff_turnover_pct") or 0)
+        if turnover >= 50: cms_signals.append(f"CRITICAL nurse turnover {turnover}% (severe staffing crisis)")
+        elif turnover >= 30: cms_signals.append(f"HIGH nurse turnover {turnover}%")
+    except (ValueError, TypeError): pass
+    try:
+        rn = float(account.get("rn_turnover_pct") or 0)
+        if rn >= 30: cms_signals.append(f"HIGH RN turnover {rn}%")
+    except (ValueError, TypeError): pass
+    try:
+        stars = int(float(account.get("cms_overall_rating") or 5))
+        if stars <= 2: cms_signals.append(f"LOW star rating {stars}/5 — facility is struggling")
+        elif stars == 3: cms_signals.append(f"Below average star rating {stars}/5")
+    except (ValueError, TypeError): pass
+    try:
+        penalties = int(float(account.get("cms_total_penalties") or 0))
+        fines = float(account.get("cms_fines_total_usd") or 0)
+        if penalties > 0: cms_signals.append(f"{penalties} CMS penalties, ${int(fines):,} in fines")
+    except (ValueError, TypeError): pass
+    try:
+        beds = int(float(account.get("bed_count") or 0))
+        if beds >= 100: cms_signals.append(f"Large facility: {beds} beds")
+    except (ValueError, TypeError): pass
+
+    cms_context = (
+        "\n\nCMS pain signals detected:\n" + "\n".join(f"- {s}" for s in cms_signals)
+    ) if cms_signals else ""
+
     prompt = f"""Score this account against Owle AI's ideal customer profile.
 
 ICP: Skilled nursing facilities (SNFs) with 60+ patient beds. Owle AI sells operational AI tools that reduce documentation burden, improve care coordination, and help with staffing workflows.
 
 Account data:
-{json.dumps(account, indent=2)}
+{json.dumps(account, indent=2)}{cms_context}
 
-Scoring guide:
+Priority scoring rules — stack these bonuses for priority_score:
+- Nurse turnover ≥50%: +25 (severe staffing crisis — perfect fit for Owle)
+- Nurse turnover 30-49%: +15
+- RN turnover ≥30%: +15
+- Star rating ≤2: +20 (facility actively struggling)
+- Star rating 3: +10
+- CMS penalties > 0: +15
+- Bed count ≥200: +20
+- Bed count ≥100: +10
+- Bed count ≥60: +5
+Cap priority_score at 100.
+
+ICP scoring rules:
+- 90-100: confirmed SNF ≥60 beds
+- 60-89: SNF, uncertain size
+- 30-59: marginal fit
+- 0-29: clear mismatch
+
 - verified_facts: only what is explicitly in the data above
 - inferred_assumptions: what you are inferring — be honest about uncertainty
 - recommendation: pursue=proceed, pause=uncertain hold, exclude=clear mismatch

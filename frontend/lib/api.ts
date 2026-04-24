@@ -68,6 +68,45 @@ export type FacilityResult = {
   category: string;
 };
 
+export type CmsFacility = {
+  name: string;
+  location: string;
+  city: string;
+  state: string;
+  beds: number;
+  stars: number;
+  staffing_stars: number | null;
+  nurse_turnover_pct: number | null;
+  rn_turnover_pct: number | null;
+  penalties: number;
+  fines_usd: number;
+  phone: string;
+  address: string;
+  ownership: string;
+  chain: string;
+  ccn: string;
+  priority_score: number;
+};
+
+export async function searchCmsSnfs(params: {
+  state: string;
+  city?: string;
+  min_beds?: number;
+  sort_by?: string;
+  max_results?: number;
+}): Promise<{ count: number; results: CmsFacility[] }> {
+  const qs = new URLSearchParams({
+    state: params.state,
+    ...(params.city ? { city: params.city } : {}),
+    ...(params.min_beds != null ? { min_beds: String(params.min_beds) } : {}),
+    ...(params.sort_by ? { sort_by: params.sort_by } : {}),
+    ...(params.max_results ? { max_results: String(params.max_results) } : {}),
+  });
+  const res = await fetch(`${API}/accounts/cms-search?${qs}`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 export async function enrichAccount(id: string) {
   const res = await fetch(`${API}/accounts/${id}/enrich`, { method: "POST" });
   if (!res.ok) throw new Error(await res.text());

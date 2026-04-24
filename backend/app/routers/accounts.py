@@ -216,6 +216,172 @@ class BulkImportRequest(BaseModel):
     facilities: List[FacilityImport]
 
 
+CMS_API = "https://data.cms.gov/provider-data/api/1/datastore/query/4pq5-n9py/0"
+
+
+def _cms_priority_score(rec: dict) -> float:
+    """Deterministic priority score 0-100 based on CMS pain signals."""
+    score = 0.0
+
+    # Bed count (bigger = more value)
+    try:
+        beds = int(float(rec.get("number_of_certified_beds") or 0))
+        if beds >= 200: score += 20
+        elif beds >= 150: score += 15
+        elif beds >= 100: score += 10
+        elif beds >= 60: score += 5
+    except (ValueError, TypeError):
+        pass
+
+    # Star rating — lower = more pain = higher priority
+    try:
+        stars = int(float(rec.get("overall_rating") or 5))
+        score += (5 - stars) * 8  # 1 star → +32, 2 stars → +24, etc.
+    except (ValueError, TypeError):
+        pass
+
+    # Nurse turnover
+    try:
+        turnover = float(rec.get("total_nursing_staff_turnover") or 0)
+        if turnover >= 75: score += 20
+        elif turnover >= 50: score += 15
+        elif turnover >= 30: score += 8
+    except (ValueError, TypeError):
+        pass
+
+    # RN turnover
+    try:
+        rn = float(rec.get("registered_nurse_turnover") or 0)
+        if rn >= 50: score += 15
+        elif rn >= 30: score += 10
+        elif rn >= 15: score += 5
+    except (ValueError, TypeError):
+        pass
+
+    # Penalties
+    try:
+        penalties = int(float(rec.get("total_number_of_penalties") or 0))
+        score += min(penalties * 5, 20)
+    except (ValueError, TypeError):
+        pass
+
+    # Fines
+    try:
+        fines = float(rec.get("total_amount_of_fines_in_dollars") or 0)
+        if fines >= 100000: score += 10
+        elif fines >= 10000: score += 5
+    except (ValueError, TypeError):
+        pass
+
+    return min(score, 100.0)
+
+
+@router.get("/cms-search")
+async def cms_search_snfs(
+    state: str = Query(..., description="US state abbreviation e.g. 'CA'"),
+    city: Optional[str] = Query(None),
+    min_beds: int = Query(100, ge=0),
+    sort_by: str = Query("priority", description="priority|turnover|rn_turnover|penalties|stars|beds"),
+    max_results: int = Query(50, ge=1, le=200),
+):
+    """Search CMS Care Compare for SNFs with pain signals (turnover, penalties, low stars)."""
+    import httpx
+
+    params: dict = {
+        "limit": 1000,
+        "offset": 0,
+        "conditions[0][property]": "state",
+        "conditions[0][value]": state.upper(),
+        "conditions[0][operator]": "=",
+    }
+    if city:
+        params["conditions[1][property]"] = "citytown"
+        params["conditions[1][value]"] = city.upper()
+        params["conditions[1][operator]"] = "="
+
+    try:
+        r = httpx.get(CMS_API, params=params, timeout=15,
+                      headers={"User-Agent": "owle-agent/1.0"})
+        results = r.json().get("results", [])
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"CMS API error: {e}")
+
+    # Filter by bed count
+    filtered = []
+    for rec in results:
+        try:
+            beds = int(float(rec.get("number_of_certified_beds") or 0))
+        except (ValueError, TypeError):
+            beds = 0
+        if beds >= min_beds:
+            filtered.append(rec)
+
+    # Sort
+    sort_key_map = {
+        "turnover": lambda r: float(r.get("total_nursing_staff_turnover") or 0),
+        "rn_turnover": lambda r: float(r.get("registered_nurse_turnover") or 0),
+        "penalties": lambda r: int(float(r.get("total_number_of_penalties") or 0)),
+        "stars": lambda r: float(r.get("overall_rating") or 5),  # ascending = lowest first
+        "beds": lambda r: int(float(r.get("number_of_certified_beds") or 0)),
+        "priority": lambda r: _cms_priority_score(r),
+    }
+    key_fn = sort_key_map.get(sort_by, sort_key_map["priority"])
+    reverse = sort_by != "stars"  # stars: lowest first (ascending)
+    filtered.sort(key=key_fn, reverse=reverse)
+
+    output = []
+    for rec in filtered[:max_results]:
+        try:
+            beds = int(float(rec.get("number_of_certified_beds") or 0))
+        except (ValueError, TypeError):
+            beds = 0
+        try:
+            stars = int(float(rec.get("overall_rating") or 0))
+        except (ValueError, TypeError):
+            stars = 0
+        try:
+            turnover = round(float(rec.get("total_nursing_staff_turnover") or 0), 1)
+        except (ValueError, TypeError):
+            turnover = None
+        try:
+            rn_turnover = round(float(rec.get("registered_nurse_turnover") or 0), 1)
+        except (ValueError, TypeError):
+            rn_turnover = None
+        try:
+            penalties = int(float(rec.get("total_number_of_penalties") or 0))
+        except (ValueError, TypeError):
+            penalties = 0
+        try:
+            fines_usd = int(float(rec.get("total_amount_of_fines_in_dollars") or 0))
+        except (ValueError, TypeError):
+            fines_usd = 0
+
+        city_val = (rec.get("citytown") or "").title()
+        state_val = (rec.get("state") or "").upper()
+
+        output.append({
+            "name": (rec.get("provider_name") or "").title(),
+            "location": f"{city_val}, {state_val}" if city_val else state_val,
+            "city": city_val,
+            "state": state_val,
+            "beds": beds,
+            "stars": stars,
+            "staffing_stars": int(float(rec.get("staffing_rating") or 0)) if rec.get("staffing_rating") else None,
+            "nurse_turnover_pct": turnover,
+            "rn_turnover_pct": rn_turnover,
+            "penalties": penalties,
+            "fines_usd": fines_usd,
+            "phone": rec.get("telephone_number", ""),
+            "address": rec.get("provider_address", ""),
+            "ownership": rec.get("ownership_type", ""),
+            "chain": rec.get("chain_name", ""),
+            "ccn": rec.get("cms_certification_number_ccn", ""),
+            "priority_score": round(_cms_priority_score(rec), 1),
+        })
+
+    return {"state": state, "city": city, "min_beds": min_beds, "count": len(output), "results": output}
+
+
 @router.get("/search")
 async def search_snfs(
     query: str = Query(..., description="Search query e.g. 'skilled nursing facility'"),
