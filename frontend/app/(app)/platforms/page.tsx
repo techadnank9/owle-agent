@@ -857,6 +857,149 @@ export default function PlatformsPage() {
         </div>
       </div>
 
+      {/* ── Best Economical Stack ── */}
+      <div className="bg-white border rounded-xl overflow-hidden">
+        <div className="px-5 py-4 border-b bg-gray-50">
+          <h2 className="font-semibold text-gray-900">Best Economical Stack — Email + LinkedIn by Budget</h2>
+          <p className="text-xs text-gray-500 mt-0.5">Exact tools, exact costs, what you actually get at each tier</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b bg-gray-50 text-gray-500">
+                <th className="text-left px-4 py-3 font-medium">Budget/mo</th>
+                <th className="text-left px-4 py-3 font-medium">Tools</th>
+                <th className="text-center px-3 py-3 font-medium">Emails/mo</th>
+                <th className="text-center px-3 py-3 font-medium">LinkedIn URLs</th>
+                <th className="text-center px-3 py-3 font-medium">LinkedIn Outreach<br/><span className="font-normal text-gray-400">(auto-send)</span></th>
+                <th className="text-center px-3 py-3 font-medium">Cost / 1k leads</th>
+                <th className="text-left px-4 py-3 font-medium">Best for</th>
+              </tr>
+            </thead>
+            <tbody>
+              {([
+                {
+                  budget: "$49/mo",
+                  highlight: false,
+                  tools: [{ name: "Apollo Basic", cost: "$49" }],
+                  emails: "2,500",
+                  linkedin_urls: true,
+                  linkedin_send: false,
+                  cost_per_1k: "~$19.60",
+                  best_for: "Solo founder just starting — one tool covers both email + LinkedIn URLs",
+                },
+                {
+                  budget: "$78/mo",
+                  highlight: false,
+                  tools: [{ name: "Hunter Starter", cost: "$49" }, { name: "Apify Starter", cost: "$29" }],
+                  emails: "2,000+ domain-verified",
+                  linkedin_urls: false,
+                  linkedin_send: false,
+                  cost_per_1k: "~$24–39",
+                  best_for: "Email-only workflows — no LinkedIn needed, highest email accuracy",
+                },
+                {
+                  budget: "$98/mo",
+                  highlight: true,
+                  star: "Best value",
+                  tools: [{ name: "Hunter Starter", cost: "$49" }, { name: "Apollo Basic", cost: "$49" }],
+                  emails: "4,500 combined (Hunter domain-verified + Apollo fills gaps)",
+                  linkedin_urls: true,
+                  linkedin_send: false,
+                  cost_per_1k: "~$13–22",
+                  best_for: "Best balance — verified emails + LinkedIn URLs, two data sources, what Owle Phase 2 uses",
+                },
+                {
+                  budget: "$127/mo",
+                  highlight: true,
+                  star: "Owle stack",
+                  tools: [{ name: "Hunter Starter", cost: "$49" }, { name: "Apollo Basic", cost: "$49" }, { name: "Apify Starter", cost: "$29" }],
+                  emails: "5,000+ with fallback scrape",
+                  linkedin_urls: true,
+                  linkedin_send: false,
+                  cost_per_1k: "~$11–15",
+                  best_for: "Full waterfall coverage — Hunter → Apollo → Apify, near-zero missed contacts",
+                },
+                {
+                  budget: "$177/mo",
+                  highlight: false,
+                  tools: [{ name: "Apollo Basic", cost: "$49" }, { name: "HeyReach Growth", cost: "$79" }, { name: "Apify Starter", cost: "$29" }],
+                  emails: "2,500 + scraped fallback",
+                  linkedin_urls: true,
+                  linkedin_send: true,
+                  cost_per_1k: "~$19–30",
+                  best_for: "LinkedIn-first teams — Apollo for data, HeyReach sends LinkedIn messages automatically",
+                },
+                {
+                  budget: "$225/mo",
+                  highlight: false,
+                  tools: [{ name: "Hunter Starter", cost: "$49" }, { name: "Apollo Basic", cost: "$49" }, { name: "Apify Starter", cost: "$29" }, { name: "HeyReach Growth", cost: "$79" }],
+                  emails: "5,000+ data coverage",
+                  linkedin_urls: true,
+                  linkedin_send: true,
+                  cost_per_1k: "~$11–15",
+                  best_for: "Full data + LinkedIn automation — best coverage across all sources + LinkedIn outreach",
+                },
+                {
+                  budget: "$322/mo",
+                  highlight: false,
+                  star: "Phase 4",
+                  tools: [{ name: "Hunter Starter", cost: "$49" }, { name: "Apollo Basic", cost: "$49" }, { name: "Apify Starter", cost: "$29" }, { name: "HeyReach Growth", cost: "$79" }, { name: "Instantly Hypergrowth", cost: "$97" }],
+                  emails: "5,000+ data · 100k sends/mo",
+                  linkedin_urls: true,
+                  linkedin_send: true,
+                  cost_per_1k: "~$11–15 data",
+                  best_for: "Max scale — full data stack + LinkedIn automation + dedicated email infra beyond Gmail limits",
+                },
+              ] as const).map((row) => (
+                <tr key={row.budget} className={`border-b last:border-0 ${row.highlight ? "bg-blue-50/40" : "hover:bg-gray-50"}`}>
+                  <td className="px-4 py-3 font-bold text-gray-900 whitespace-nowrap">
+                    {row.budget}
+                    {"star" in row && row.star && (
+                      <span className="ml-1.5 text-xs font-semibold text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded-full">{row.star}</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-col gap-0.5">
+                      {row.tools.map(t => (
+                        <span key={t.name} className="text-gray-700"><span className="font-medium">{t.name}</span> <span className="text-gray-400">{t.cost}</span></span>
+                      ))}
+                    </div>
+                  </td>
+                  <td className="px-3 py-3 text-center text-gray-700">{row.emails}</td>
+                  <td className="px-3 py-3 text-center">
+                    {row.linkedin_urls
+                      ? <span className="text-green-600 font-semibold">✓ included</span>
+                      : <span className="text-red-400">✗ none</span>}
+                  </td>
+                  <td className="px-3 py-3 text-center">
+                    {row.linkedin_send
+                      ? <span className="text-green-600 font-semibold">✓ via HeyReach</span>
+                      : <span className="text-gray-300">— manual only</span>}
+                  </td>
+                  <td className="px-3 py-3 text-center font-semibold text-gray-800 whitespace-nowrap">{row.cost_per_1k}</td>
+                  <td className="px-4 py-3 text-gray-600 max-w-xs">{row.best_for}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="px-5 py-3 border-t bg-gray-50 grid grid-cols-3 gap-4">
+          <div className="bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+            <p className="text-xs font-semibold text-blue-800 mb-1">Minimum viable (email + LinkedIn data)</p>
+            <p className="text-xs text-blue-700">Apollo Basic <span className="font-bold">$49/mo</span> — single tool gives you 2,500 email credits + LinkedIn URLs from 275M database. Best starting point before adding Hunter.</p>
+          </div>
+          <div className="bg-green-50 border border-green-100 rounded-lg px-3 py-2">
+            <p className="text-xs font-semibold text-green-800 mb-1">Recommended sweet spot</p>
+            <p className="text-xs text-green-700">Hunter + Apollo <span className="font-bold">$98/mo</span> — Hunter finds emails by domain (highest accuracy), Apollo adds LinkedIn URLs + fills gaps. ~90% coverage of SNF contacts.</p>
+          </div>
+          <div className="bg-purple-50 border border-purple-100 rounded-lg px-3 py-2">
+            <p className="text-xs font-semibold text-purple-800 mb-1">Add LinkedIn outreach</p>
+            <p className="text-xs text-purple-700">+ HeyReach Growth <span className="font-bold">+$79/mo</span> — connects and messages contacts on LinkedIn automatically. Pairs with any data tier above. Biggest jump in reply rate.</p>
+          </div>
+        </div>
+      </div>
+
       {/* ── Owle vs Direct ── */}
       <div className="bg-white border rounded-xl overflow-hidden">
         <div className="px-5 py-4 border-b bg-gray-50">
