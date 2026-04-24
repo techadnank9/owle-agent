@@ -234,12 +234,21 @@ export default function AccountDetailPage({ params }: { params: Promise<{ id: st
   async function handleEnrich() {
     setEnriching(true);
     setEnrichMsg(null);
+    setApolloMsg(null);
     try {
-      await enrichAccount(id);
-      setEnrichMsg("⏳ Enriching — LinkedIn profiles + re-scoring running… reloading in 30s");
+      // Run enrichment + contact search in parallel
+      const [, contactRes] = await Promise.allSettled([
+        enrichAccount(id),
+        apolloEnrich(id),
+      ]);
+      const cr = contactRes.status === "fulfilled" ? contactRes.value : null;
+      const contactNote = cr
+        ? ` · ${cr.found} contact${cr.found !== 1 ? "s" : ""} found (${(cr.sources ?? []).join(", ")})`
+        : "";
+      setEnrichMsg(`⏳ Re-scoring running…${contactNote} reloading in 30s`);
       setTimeout(() => {
         loadData();
-        setEnrichMsg("✓ Done — refresh if LinkedIn profiles not showing yet");
+        setEnrichMsg(`✓ Done${contactNote}`);
         setEnriching(false);
       }, 30000);
     } catch (e: unknown) {
@@ -254,16 +263,16 @@ export default function AccountDetailPage({ params }: { params: Promise<{ id: st
     try {
       const res = await apolloEnrich(id);
       if (res.found === 0) {
-        setApolloMsg("No matching contacts found on Apollo for this account.");
+        setApolloMsg("No contacts found.");
       } else {
-        setApolloMsg(`✓ Found ${res.found} contact${res.found !== 1 ? "s" : ""}, ${res.upserted} saved.`);
+        setApolloMsg(`✓ ${res.found} contact${res.found !== 1 ? "s" : ""} found (${(res.sources ?? []).join(", ")}), ${res.upserted} saved.`);
         loadData();
       }
     } catch (e: unknown) {
       setApolloMsg(`Error: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setApolloLoading(false);
-      setTimeout(() => setApolloMsg(null), 6000);
+      setTimeout(() => setApolloMsg(null), 8000);
     }
   }
 
@@ -353,7 +362,7 @@ export default function AccountDetailPage({ params }: { params: Promise<{ id: st
             </Button>
             <Button variant="outline" size="sm" onClick={handleApolloEnrich} disabled={apolloLoading}
               className="border-purple-200 text-purple-700 hover:bg-purple-50">
-              {apolloLoading ? "Searching…" : "Find Contacts (Apollo)"}
+              {apolloLoading ? "Searching…" : "Find Contacts"}
             </Button>
           </div>
         </div>
