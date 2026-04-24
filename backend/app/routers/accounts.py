@@ -749,7 +749,6 @@ async def apollo_enrich(account_id: str):
     try:
         from ..hunter_client import search_contacts as hunter_search
         hunter_people = hunter_search(account["name"])
-        # Deduplicate by email — skip if already found via Apollo
         existing_emails = {p["email"] for p in people if p.get("email")}
         for p in hunter_people:
             if p.get("email") and p["email"] in existing_emails:
@@ -759,6 +758,20 @@ async def apollo_enrich(account_id: str):
     except Exception as e:
         logger.warning("Hunter search skipped for %s: %s", account["name"], e)
         errors.append(f"Hunter: {e}")
+
+    # Apify email finder (free — finds emails via company domain)
+    try:
+        from ..apify_leads_client import search_contacts as apify_search
+        apify_people = apify_search(account["name"], account.get("location"))
+        existing_emails = {p["email"] for p in people if p.get("email")}
+        for p in apify_people:
+            if p.get("email") and p["email"] in existing_emails:
+                continue
+            people.append(p)
+        sources_tried.append("apify")
+    except Exception as e:
+        logger.warning("Apify search skipped for %s: %s", account["name"], e)
+        errors.append(f"Apify: {e}")
 
     if not people and errors:
         raise HTTPException(status_code=502, detail="; ".join(errors))
@@ -780,7 +793,7 @@ async def apollo_enrich(account_id: str):
             "email": p.get("email"),
             "linkedin_url": p.get("linkedin_url"),
             "source": p.get("source", "unknown"),
-            "confidence": 0.85 if p.get("source") == "apollo" else 0.75,
+            "confidence": 0.85 if p.get("source") == "apollo" else (0.75 if p.get("source") == "hunter" else 0.55),
         }
         if existing.data:
             supabase.table("contacts").update(payload).eq("id", existing.data[0]["id"]).execute()
