@@ -21,12 +21,12 @@ const PHASES = [
       },
       {
         service: "Hunter.io",
-        plan: "Outreach Platform — Starter",
+        plan: "Outreach Platform — Starter ($49/mo subscription)",
         cost: "$49/mo",
         status: "buy-now" as const,
-        why: "Primary contact source. 2,000 domain searches/mo via API. Finds all emails at a company by domain. API included on all paid plans.",
+        why: "Flat $49/mo subscription — NOT pay-per-use. Includes 2,000 domain searches/mo + API key that Owle calls directly (hunter_client.py). Subscribe → get API key → paste into Render env → enrichment button works.",
         link: "https://hunter.io/pricing",
-        note: "⚠ Use Outreach Platform ($49/mo subscription) — NOT the Data Platform (pay-as-you-go bulk credits, ~$6,500+ for 1k searches).",
+        note: "⚠ Hunter has TWO products. You want 'Outreach Platform' ($49/mo subscription, API included). Do NOT buy 'Data Platform' (pay-as-you-go bulk credits — costs ~$6,500 per 1k searches, no API key).",
       },
       {
         service: "Anthropic",
