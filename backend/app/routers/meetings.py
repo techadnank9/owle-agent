@@ -102,6 +102,7 @@ def book_meeting(body: BookMeetingRequest):
 
     # Create Google Calendar event with Meet link
     calendar_result: dict = {"meet_link": None, "event_link": None}
+    calendar_error: str | None = None
     try:
         from ..calendar_client import create_meeting_event
         calendar_result = create_meeting_event(
@@ -123,6 +124,7 @@ def book_meeting(body: BookMeetingRequest):
         if meet_link:
             _update_reply_draft_with_meet_link(supabase, body.account_id, meet_link)
     except Exception as e:
+        calendar_error = str(e)
         logger.warning("Calendar event creation failed: %s", e)
 
     # Create confirmation email draft → Ready to Send (status="approved"), deduplicated
@@ -164,6 +166,7 @@ Owle AI"""
         "proposed_time": body.proposed_time,
         "meet_link": calendar_result.get("meet_link"),
         "outreach_action_id": outreach_action_id,
+        "calendar_error": calendar_error,
     }
 
 

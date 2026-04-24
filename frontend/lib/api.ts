@@ -167,7 +167,7 @@ export async function bulkImportCms(facilities: CmsFacility[]) {
 export async function bookMeeting(
   accountId: string,
   proposedTime: string,
-): Promise<{ status: string; proposed_time: string; meet_link: string | null; outreach_action_id: string | null }> {
+): Promise<{ status: string; proposed_time: string; meet_link: string | null; outreach_action_id: string | null; calendar_error?: string | null }> {
   const res = await fetch(`${API}/meetings/book`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

@@ -114,6 +114,7 @@ export function ReplyCard({ replies }: { replies: Reply[] }) {
   const [booking, setBooking] = useState(false);
   const [booked, setBooked] = useState(alreadyBooked);
   const [meetLink, setMeetLink] = useState<string | null>(existingMeetLink);
+  const [calendarError, setCalendarError] = useState<string | null>(null);
   const [outreachActionId, setOutreachActionId] = useState<string | null>(null);
 
   const _initEdit = () => {
@@ -220,13 +221,14 @@ export function ReplyCard({ replies }: { replies: Reply[] }) {
   async function handleBookMeeting() {
     if (!accountId || booking || booked) return;
     setBooking(true);
+    setCalendarError(null);
     try {
       const result = await bookMeeting(accountId, proposedTime ?? "TBD");
-      if (!result.meet_link) throw new Error("No Meet link returned");
       setBooked(true);
       setMeetLink(result.meet_link);
+      if (result.calendar_error) setCalendarError(result.calendar_error);
       if (result.outreach_action_id) setOutreachActionId(result.outreach_action_id);
-      if (draftText) {
+      if (result.meet_link && draftText) {
         const injected = injectMeetLink(draftText, result.meet_link);
         if (injected !== draftText) { setDraftText(injected); setDraftDirty(false); }
       }
@@ -378,11 +380,13 @@ export function ReplyCard({ replies }: { replies: Reply[] }) {
                 <span className="text-xs text-green-700 font-medium">
                   ✓ Meeting booked{displayTime ? ` · ${displayTime}` : ""}
                 </span>
-                {meetLink && (
+                {meetLink ? (
                   <a href={meetLink} target="_blank" rel="noreferrer" className="text-xs text-blue-600 hover:underline">
                     Open Meet →
                   </a>
-                )}
+                ) : calendarError ? (
+                  <span className="text-xs text-red-500" title={calendarError}>⚠ Calendar failed</span>
+                ) : null}
                 {outreachActionId && (
                   <a href="/ready" className="text-xs text-gray-500 hover:underline">
                     View confirmation email →

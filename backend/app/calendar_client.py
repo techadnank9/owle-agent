@@ -19,6 +19,9 @@ SCOPES = [
 def build_calendar_service():
     token_data = json.loads(settings.gmail_token)
     creds = Credentials.from_authorized_user_info(token_data, SCOPES)
+    if not creds.valid:
+        import google.auth.transport.requests as _treq
+        creds.refresh(_treq.Request())
     return build("calendar", "v3", credentials=creds)
 
 
