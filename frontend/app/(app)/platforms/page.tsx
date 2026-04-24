@@ -488,6 +488,70 @@ const PLATFORMS: Platform[] = [
     ],
     best_for: "Small agencies and lean sales teams wanting affordable all-in-one cold outreach without separate subscriptions",
   },
+  {
+    name: "HeyReach",
+    tagline: "LinkedIn outreach automation at scale",
+    color: "bg-blue-700",
+    entry_monthly: 79,
+    has_phones: false,
+    has_sequences: true,
+    plans: [
+      { name: "Growth", billed_monthly: "$79/seat/mo", billed_annual: "$59/seat/mo ($711/yr)", credits: "100 email-finding credits/sender · unlimited LinkedIn actions", key_features: "Unlimited campaigns, all LinkedIn actions (connect/message/follow/view), unified inbox, API & webhooks, MCP Server, Clay/HubSpot/Zapier integrations" },
+      { name: "Agency", billed_monthly: "$999/mo (50 senders)", billed_annual: "$749/mo ($8,988/yr)", credits: "1,000 email-finding credits/sender", key_features: "All Growth + whitelabel, bring your own proxies, done-for-you onboarding, dedicated Slack channel" },
+      { name: "Unlimited", billed_monthly: "$1,999/mo (up to 500 senders, fair-use)", billed_annual: "$1,499/mo ($17,988/yr)", credits: "3,000 email-finding credits", key_features: "All Agency + multi-brand whitelabel, done-for-you migration, priority support" },
+    ],
+    pros: [
+      "LinkedIn-native — built specifically for LinkedIn outreach at scale",
+      "Unlimited campaigns, connections, messages, follows, profile views on all plans",
+      "Unified inbox across all LinkedIn accounts in one place",
+      "Strong integrations: Clay, RB2B, HubSpot, Zapier, Make, Instantly, Smartlead",
+      "API & webhooks + MCP Server included on every plan",
+      "Multi-sender management — great for agencies running client LinkedIn accounts",
+    ],
+    cons: [
+      "LinkedIn only — no email sequences built-in (must integrate Instantly or Smartlead for email)",
+      "Email-finding credits are very limited — 100/sender on Growth (not a data platform)",
+      "No native contact database — requires Clay, Apollo, or another enrichment source",
+      "Expensive vs. email-only tools ($79/mo per seat vs. $47/mo Instantly)",
+      "LinkedIn ToS grey area — aggressive usage risks account restriction",
+      "Not useful if your ICP is not active on LinkedIn",
+    ],
+    best_for: "Agencies and teams doing LinkedIn-first outreach at volume — especially managing multiple client LinkedIn accounts",
+    data_note: "Prices confirmed from HeyReach live pricing page (April 2026). Annual billing saves ~25%. Email-finding credits are a small bonus, not a core feature.",
+  },
+  {
+    name: "Instantly.ai",
+    tagline: "Unlimited email sending + B2B lead database",
+    color: "bg-violet-600",
+    entry_monthly: 47,
+    has_phones: false,
+    has_sequences: true,
+    plans: [
+      { name: "Outreach — Growth", billed_monthly: "$47/mo", billed_annual: "", credits: "5,000 emails/mo · 1,000 uploaded contacts · unlimited email accounts + warmup", key_features: "Unlimited email accounts, unlimited warmup, chat support" },
+      { name: "Outreach — Hypergrowth", billed_monthly: "$97/mo", billed_annual: "", credits: "100,000 emails/mo · 25,000 uploaded contacts", key_features: "All Growth + premium live support, SISR deliverability system" },
+      { name: "Outreach — Light Speed", billed_monthly: "$358/mo", billed_annual: "", credits: "500,000 emails/mo · 100,000 uploaded contacts", key_features: "SISR system (dedicated IP + server protection), highest deliverability" },
+      { name: "Credits — Growth", billed_monthly: "$47/mo (separate plan)", billed_annual: "", credits: "1,500–2,000 credits/mo from 450M+ B2B database", key_features: "Email enrichment (5+ providers), AI agents, 13 search filters, 100+ community templates" },
+      { name: "Credits — Supersonic", billed_monthly: "$97/mo (separate plan)", billed_annual: "", credits: "5,000–7,500 credits/mo", key_features: "All Credits Growth features at higher volume" },
+    ],
+    pros: [
+      "Unlimited email accounts + warmup on every plan — no per-inbox fee",
+      "Highest send volume at lowest price: $47 for 5k/mo, $97 for 100k/mo",
+      "B2B lead database (450M+) available as a separate Credits add-on",
+      "Built-in email warmup to protect deliverability automatically",
+      "Simple UI — fast to set up and launch new campaigns",
+      "Strong community with 100+ proven templates",
+    ],
+    cons: [
+      "Two separate products: Outreach (sending) + Credits (data) — you likely need both, billed separately",
+      "Growth plan limit (5,000 emails/mo) is low for scaling outreach",
+      "No LinkedIn automation built-in — requires HeyReach or similar",
+      "No native CRM — must integrate HubSpot, Salesforce, etc.",
+      "No phone number data",
+      "Contact database quality not as rigorously verified as Apollo or Hunter",
+    ],
+    best_for: "Cold email founders and agencies who want maximum email send volume at minimum cost, without per-inbox charges",
+    data_note: "Prices confirmed from Instantly live pricing page (April 2026). Two separate product lines — Outreach (sending infrastructure) and Credits (B2B data). Both are optional and billed independently.",
+  },
 ];
 
 type Tab = "overview" | "pricing" | "proscons";
@@ -1044,7 +1108,7 @@ export default function PlatformsPage() {
               </div>
             ))}
           </div>
-          <p className="text-xs text-amber-600 mt-3">* At 1,000 leads/mo — Apollo Basic and Snov.io Starter hit their credit cap. Upgrade to Professional ($99) and Pro S ($99) respectively.</p>
+          <p className="text-xs text-amber-600 mt-3">* At 1,000 leads/mo — Snov.io Starter hits its credit cap (1,000/mo). Apollo Basic handles up to 2,500 leads before needing an upgrade. Upgrade Snov.io to Pro S ($99/mo) for 5,000 credits.</p>
           <p className="text-xs text-gray-400 mt-1">Owle variable cost: ~$0.05/lead (Anthropic Claude for scoring + email drafting). Fixed: Render $7 + Hunter $49 + Apify $29 = $85 base.</p>
         </div>
       </div>
