@@ -1,10 +1,295 @@
 "use client";
 import { useState } from "react";
 
+// ─── Owle Phase Data ──────────────────────────────────────────────────────────
+
+const PHASES = [
+  {
+    id: 1,
+    label: "Phase 1 — Start Now",
+    sublabel: "Get Owle fully working · <100 leads/mo",
+    color: "blue",
+    total: "~$66–76/mo",
+    items: [
+      {
+        service: "Render",
+        plan: "Starter Web Service",
+        cost: "$7/mo",
+        status: "required" as const,
+        why: "Backend (FastAPI) stays always-on. Free tier spins down after 15 min inactivity — pay $7 to fix.",
+        link: "https://render.com/pricing",
+      },
+      {
+        service: "Hunter.io",
+        plan: "Outreach Platform — Starter",
+        cost: "$49/mo",
+        status: "buy-now" as const,
+        why: "Primary contact source. 2,000 domain searches/mo via API. Finds all emails at a company by domain. API included on all paid plans.",
+        link: "https://hunter.io/pricing",
+        note: "⚠ Use Outreach Platform ($49/mo subscription) — NOT the Data Platform (pay-as-you-go bulk credits, ~$6,500+ for 1k searches).",
+      },
+      {
+        service: "Anthropic",
+        plan: "Pay-as-you-go",
+        cost: "~$10–20/mo",
+        status: "active" as const,
+        why: "Claude Sonnet 4.6 for ICP scoring, email drafts, reply classification, stakeholder mapping. ~$0.05/account at 100 accounts/mo.",
+        link: "https://www.anthropic.com/pricing",
+      },
+      {
+        service: "Supabase",
+        plan: "Free",
+        cost: "$0/mo",
+        status: "active" as const,
+        why: "Postgres DB + real-time + auth. 500 MB storage, 50k MAU — enough for early stage.",
+      },
+      {
+        service: "Vercel",
+        plan: "Hobby",
+        cost: "$0/mo",
+        status: "active" as const,
+        why: "Frontend hosting. Free covers custom domains + unlimited deploys.",
+      },
+      {
+        service: "Gmail API",
+        plan: "OAuth2",
+        cost: "$0/mo",
+        status: "active" as const,
+        why: "Send outreach emails + receive replies via webhook. Free within Google quotas.",
+      },
+      {
+        service: "Google Calendar API",
+        plan: "OAuth2",
+        cost: "$0/mo",
+        status: "active" as const,
+        why: "Create meeting events + Google Meet links automatically on booking.",
+      },
+      {
+        service: "AgentMail",
+        plan: "Free",
+        cost: "$0/mo",
+        status: "active" as const,
+        why: "Managed reply inbox. Free: 3 inboxes, 3,000 emails/mo. Enough for Phase 1 volume.",
+      },
+      {
+        service: "Tavily",
+        plan: "Researcher (free)",
+        cost: "$0/mo",
+        status: "active" as const,
+        why: "Web search for company context in web_enricher. 1,000 free searches/mo.",
+      },
+    ],
+  },
+  {
+    id: 2,
+    label: "Phase 2 — Scale Up",
+    sublabel: "3 enrichment sources · 100–500 leads/mo",
+    color: "indigo",
+    total: "~$164–184/mo",
+    items: [
+      {
+        service: "Everything in Phase 1",
+        plan: "",
+        cost: "~$66–76/mo",
+        status: "carry" as const,
+        why: "All Phase 1 services continue.",
+      },
+      {
+        service: "Apify",
+        plan: "Starter",
+        cost: "$29/mo",
+        status: "buy-now" as const,
+        why: "Fallback contact finder when Hunter finds nothing. $29/mo prepaid credits at $0.20/CU. Easy-email-finder actor ~0.5–1 CU per domain. Free tier ($5) runs out after ~25 lookups.",
+        link: "https://apify.com/pricing",
+      },
+      {
+        service: "Apollo.io",
+        plan: "Basic",
+        cost: "~$49–59/mo",
+        status: "buy-now" as const,
+        why: "Fixes the 403 error on free plan. Basic unlocks People Search API + Person API for contact lookup — what Owle uses. 1,000 export credits/mo from 275M contact database.",
+        link: "https://www.apollo.io/pricing",
+        note: "⚠ Pricing page is JS-rendered — no public prices. ~$49/mo annual, ~$59/mo monthly based on public reports. Advanced bulk API needs Custom plan (sales call).",
+      },
+      {
+        service: "Anthropic",
+        plan: "Pay-as-you-go",
+        cost: "~$20–40/mo",
+        status: "scales" as const,
+        why: "Higher usage as lead volume grows. ~$0.05/account.",
+      },
+    ],
+  },
+  {
+    id: 3,
+    label: "Phase 3 — Full Growth",
+    sublabel: "Production-grade · 500–1,000+ leads/mo",
+    color: "violet",
+    total: "~$368–468/mo",
+    items: [
+      {
+        service: "Everything in Phase 2",
+        plan: "",
+        cost: "~$164/mo",
+        status: "carry" as const,
+        why: "All Phase 2 services continue.",
+      },
+      {
+        service: "Supabase",
+        plan: "Pro",
+        cost: "$25/mo",
+        status: "upgrade" as const,
+        why: "Upgrade when DB hits 500 MB. Unlocks 8 GB storage, daily backups, no auto-pausing.",
+      },
+      {
+        service: "AgentMail",
+        plan: "Developer",
+        cost: "$20/mo",
+        status: "upgrade" as const,
+        why: "Remove daily reply cap. Needed when reply volume grows beyond free tier limits.",
+      },
+      {
+        service: "Hunter.io",
+        plan: "Growth",
+        cost: "$149/mo",
+        status: "upgrade" as const,
+        why: "Upgrade from Starter when 2,000 searches/mo isn't enough. Growth = 10,000 searches/mo.",
+      },
+      {
+        service: "Anthropic",
+        plan: "Pay-as-you-go",
+        cost: "~$50–100/mo",
+        status: "scales" as const,
+        why: "Full pipeline at scale — 500–1,000 accounts/mo.",
+      },
+      {
+        service: "Vercel",
+        plan: "Pro (optional)",
+        cost: "$20/mo",
+        status: "optional" as const,
+        why: "Only needed when team grows. Adds password protection, team members, analytics.",
+      },
+    ],
+  },
+];
+
+const STATUS_STYLE: Record<string, string> = {
+  "required":  "bg-red-50 text-red-600 border border-red-200",
+  "buy-now":   "bg-blue-50 text-blue-600 border border-blue-200",
+  "active":    "bg-green-50 text-green-700 border border-green-200",
+  "carry":     "bg-gray-50 text-gray-500 border border-gray-200",
+  "upgrade":   "bg-amber-50 text-amber-600 border border-amber-200",
+  "scales":    "bg-purple-50 text-purple-600 border border-purple-200",
+  "optional":  "bg-gray-50 text-gray-400 border border-gray-200",
+};
+
+const STATUS_LABEL: Record<string, string> = {
+  "required": "required",
+  "buy-now":  "buy now",
+  "active":   "active",
+  "carry":    "carry forward",
+  "upgrade":  "upgrade",
+  "scales":   "scales with usage",
+  "optional": "optional",
+};
+
+const PHASE_HEADER: Record<string, string> = {
+  blue:   "bg-blue-600",
+  indigo: "bg-indigo-600",
+  violet: "bg-violet-600",
+};
+
+// ─── Tool reference data ──────────────────────────────────────────────────────
+
+const TOOLS = [
+  {
+    name: "Hunter.io",
+    role: "Primary email finder",
+    used_by_owle: true,
+    owle_plan: "Outreach Platform — Starter",
+    owle_cost: "$49/mo",
+    api_tier: "All paid plans include API",
+    credits: "2,000/mo",
+    note: "Two products: Outreach Platform (subscription, API included) vs Data Platform (pay-as-you-go bulk credits, ~$6,500+ for 1k searches). Owle uses Outreach Platform.",
+  },
+  {
+    name: "Apollo.io",
+    role: "Contact database + LinkedIn URLs",
+    used_by_owle: true,
+    owle_plan: "Basic",
+    owle_cost: "~$49–59/mo",
+    api_tier: "Basic = People Search API. Custom = full advanced API.",
+    credits: "1,000 export/mo",
+    note: "Free plan returns 403 on all API endpoints. Basic fixes this. Pricing page is JS-rendered — prices unconfirmed from official source.",
+  },
+  {
+    name: "Apify",
+    role: "Email scraping fallback",
+    used_by_owle: true,
+    owle_plan: "Starter",
+    owle_cost: "$29/mo",
+    api_tier: "All plans (API-first platform)",
+    credits: "$29 prepaid at $0.20/CU",
+    note: "Pay-as-you-go compute. ~0.5–1 CU per domain lookup. Free tier ($5) runs out after ~25 lookups.",
+  },
+  {
+    name: "Anthropic",
+    role: "AI brain (scoring, drafts, classification)",
+    used_by_owle: true,
+    owle_plan: "Pay-as-you-go",
+    owle_cost: "~$10–100/mo",
+    api_tier: "API-only product",
+    credits: "$3/M input · $15/M output tokens",
+    note: "Claude Sonnet 4.6. ~$0.05/account processed through full pipeline.",
+  },
+  {
+    name: "Tavily",
+    role: "Web search for company context",
+    used_by_owle: true,
+    owle_plan: "Researcher (free)",
+    owle_cost: "$0/mo",
+    api_tier: "Free tier: 1,000 searches/mo",
+    credits: "1,000/mo free",
+    note: "Used in web_enricher to find company websites + context before scoring.",
+  },
+  {
+    name: "AgentMail",
+    role: "Reply inbox (receive inbound emails)",
+    used_by_owle: true,
+    owle_plan: "Free → Developer",
+    owle_cost: "$0 → $20/mo",
+    api_tier: "Webhook-based",
+    credits: "Free: 3,000 emails/mo",
+    note: "Free tier has daily cap. Developer ($20/mo) removes it. Upgrade in Phase 3.",
+  },
+  {
+    name: "Render",
+    role: "Backend hosting",
+    used_by_owle: true,
+    owle_plan: "Starter",
+    owle_cost: "$7/mo",
+    api_tier: "N/A",
+    credits: "N/A",
+    note: "Free tier spins down after 15 min inactivity. $7/mo keeps it always-on — required for webhook delivery.",
+  },
+  {
+    name: "Supabase",
+    role: "Database + realtime + auth",
+    used_by_owle: true,
+    owle_plan: "Free → Pro",
+    owle_cost: "$0 → $25/mo",
+    api_tier: "N/A",
+    credits: "Free: 500 MB",
+    note: "Free covers early stage. Upgrade to Pro ($25/mo) when DB hits 500 MB or needs daily backups.",
+  },
+];
+
+// ─── Platform comparison data ─────────────────────────────────────────────────
+
 type Plan = {
   name: string;
-  billed_monthly: string;   // price if paying month-to-month
-  billed_annual: string;    // price per month when paying annually
+  billed_monthly: string;
+  billed_annual: string;
   credits: string;
   key_features: string;
 };
@@ -205,149 +490,232 @@ const PLATFORMS: Platform[] = [
   },
 ];
 
-const COLORS: Record<string, string> = {
-  "Apollo.io": "border-orange-200 bg-orange-50 text-orange-700",
-  "Hunter.io": "border-yellow-200 bg-yellow-50 text-yellow-700",
-  "Instantly.ai": "border-blue-200 bg-blue-50 text-blue-700",
-  "ZoomInfo": "border-indigo-200 bg-indigo-50 text-indigo-700",
-  "Lusha": "border-pink-200 bg-pink-50 text-pink-700",
-  "Snov.io": "border-teal-200 bg-teal-50 text-teal-700",
-};
-
 type Tab = "overview" | "pricing" | "proscons";
 
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default function PlatformsPage() {
+  const [expandedPhase, setExpandedPhase] = useState<number>(1);
+  const [showTools, setShowTools] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("overview");
 
   const active = selected ? PLATFORMS.find(p => p.name === selected) : null;
 
   return (
-    <div className="max-w-5xl mx-auto flex flex-col gap-6">
+    <div className="max-w-4xl mx-auto flex flex-col gap-6 pb-8">
 
+      {/* ── Header ── */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Platform Comparison</h1>
-        <p className="text-sm text-gray-500 mt-1">Real pricing from official sources · April 2026 · All prices shown per month</p>
+        <h1 className="text-2xl font-bold text-gray-900">Owle Platform — What to Subscribe To</h1>
+        <p className="text-sm text-gray-500 mt-1">
+          Phased buying guide · start lean, upgrade when volume demands it · all prices monthly billing
+        </p>
       </div>
 
-      {/* Best solution recommendation */}
-      <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl overflow-hidden text-white">
-        <div className="px-5 py-4 border-b border-blue-500">
-          <div className="flex items-center gap-2">
-            <span className="text-lg">★</span>
-            <h2 className="font-bold text-white">Best Solution — What You Should Actually Do</h2>
-          </div>
-          <p className="text-xs text-blue-200 mt-0.5">Recommended action plan for Owle based on your current setup and budget</p>
+      {/* ── ROI callout ── */}
+      <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl px-6 py-5 flex items-center justify-between gap-6 text-white">
+        <div>
+          <p className="font-bold text-lg">One SNF contract = $10,000–50,000/year</p>
+          <p className="text-blue-200 text-sm mt-0.5">Phase 1 stack costs $66–76/mo = $792/year. A single deal pays for <strong className="text-white">10–60 years</strong> of the stack.</p>
         </div>
-
-        <div className="grid grid-cols-3 divide-x divide-blue-500">
-          {/* Phase 1 */}
-          <div className="px-5 py-4">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="bg-blue-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">Phase 1</span>
-              <span className="text-sm font-semibold text-white">Start Now</span>
-            </div>
-            <p className="text-xs text-blue-200 mb-3">Get Owle fully working · &lt;100 leads/mo</p>
-            <div className="flex flex-col gap-2 text-sm">
-              {[
-                { s: "Render", p: "Starter", c: "$7/mo", note: "Keep backend always-on" },
-                { s: "Hunter.io", p: "Starter", c: "$49/mo", note: "Primary contact source — 2,000 domain searches/mo" },
-                { s: "Anthropic", p: "Pay-as-you-go", c: "~$10–20/mo", note: "ICP scoring + email drafts" },
-              ].map(r => (
-                <div key={r.s} className="flex justify-between items-start gap-2">
-                  <div>
-                    <span className="font-medium text-white">{r.s}</span>
-                    <span className="text-blue-300 ml-1 text-xs">{r.p}</span>
-                    <p className="text-xs text-blue-200">{r.note}</p>
-                  </div>
-                  <span className="font-bold text-white whitespace-nowrap text-sm">{r.c}</span>
-                </div>
-              ))}
-            </div>
-            <div className="mt-4 pt-3 border-t border-blue-500">
-              <p className="text-xs text-blue-200">Monthly total</p>
-              <p className="text-2xl font-bold text-white">~$66–76<span className="text-sm font-normal text-blue-300">/mo</span></p>
-            </div>
-          </div>
-
-          {/* Phase 2 */}
-          <div className="px-5 py-4">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="bg-white text-blue-700 text-xs font-bold px-2 py-0.5 rounded-full">Phase 2</span>
-              <span className="text-sm font-semibold text-white">Scale Up</span>
-            </div>
-            <p className="text-xs text-blue-200 mb-3">Higher volume + 3 enrichment sources · 100–500 leads/mo</p>
-            <div className="flex flex-col gap-2 text-sm">
-              {[
-                { s: "Render", p: "Starter", c: "$7/mo", note: "Same" },
-                { s: "Hunter.io", p: "Starter", c: "$49/mo", note: "Same — primary source" },
-                { s: "Apollo.io", p: "Basic", c: "$49/mo", note: "Upgrade fixes API 403 — adds 1,000 more contacts/mo from 275M database" },
-                { s: "Apify", p: "Starter", c: "$29/mo", note: "Enough credits for real fallback volume" },
-                { s: "Anthropic", p: "Pay-as-you-go", c: "~$20–40/mo", note: "Higher usage as leads grow" },
-              ].map(r => (
-                <div key={r.s} className="flex justify-between items-start gap-2">
-                  <div>
-                    <span className="font-medium text-white">{r.s}</span>
-                    <span className="text-blue-300 ml-1 text-xs">{r.p}</span>
-                    <p className="text-xs text-blue-200">{r.note}</p>
-                  </div>
-                  <span className="font-bold text-white whitespace-nowrap text-sm">{r.c}</span>
-                </div>
-              ))}
-            </div>
-            <div className="mt-4 pt-3 border-t border-blue-500">
-              <p className="text-xs text-blue-200">Monthly total</p>
-              <p className="text-2xl font-bold text-white">~$154–174<span className="text-sm font-normal text-blue-300">/mo</span></p>
-            </div>
-          </div>
-
-          {/* Phase 3 */}
-          <div className="px-5 py-4">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="bg-blue-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">Phase 3</span>
-              <span className="text-sm font-semibold text-white">Full Growth</span>
-            </div>
-            <p className="text-xs text-blue-200 mb-3">Production-grade infrastructure · 500–1,000+ leads/mo</p>
-            <div className="flex flex-col gap-2 text-sm">
-              {[
-                { s: "Phase 2 stack", p: "", c: "~$154/mo", note: "Everything from Phase 2" },
-                { s: "Supabase", p: "Pro", c: "$25/mo", note: "8 GB DB + daily backups — needed when DB grows" },
-                { s: "AgentMail", p: "Developer", c: "$20/mo", note: "Remove reply inbox daily cap" },
-                { s: "Hunter.io", p: "→ Growth", c: "$149/mo", note: "Upgrade from Starter — 10,000 searches/mo" },
-                { s: "Anthropic", p: "Pay-as-you-go", c: "~$50–100/mo", note: "Full pipeline at scale" },
-              ].map(r => (
-                <div key={r.s} className="flex justify-between items-start gap-2">
-                  <div>
-                    <span className="font-medium text-white">{r.s}</span>
-                    {r.p && <span className="text-blue-300 ml-1 text-xs">{r.p}</span>}
-                    <p className="text-xs text-blue-200">{r.note}</p>
-                  </div>
-                  <span className="font-bold text-white whitespace-nowrap text-sm">{r.c}</span>
-                </div>
-              ))}
-            </div>
-            <div className="mt-4 pt-3 border-t border-blue-500">
-              <p className="text-xs text-blue-200">Monthly total</p>
-              <p className="text-2xl font-bold text-white">~$368–468<span className="text-sm font-normal text-blue-300">/mo</span></p>
-            </div>
-          </div>
-        </div>
-
-        {/* Bottom callout */}
-        <div className="px-5 py-3 bg-blue-800/40 flex items-start gap-4">
-          <div className="flex-1">
-            <p className="text-sm font-semibold text-white mb-0.5">The math is simple</p>
-            <p className="text-xs text-blue-200">One closed SNF contract = $10,000–50,000/year. Phase 1 stack at $66/mo = <strong className="text-white">$792/year</strong>. A single deal pays for <strong className="text-white">12–60 years</strong> of the stack. Start with Phase 1 today — upgrade only when volume demands it.</p>
-          </div>
-          <div className="shrink-0 bg-blue-500/50 rounded-lg px-4 py-2 text-center">
-            <p className="text-xs text-blue-200">Do right now</p>
-            <p className="text-sm font-bold text-white">Subscribe to<br/>Hunter Starter</p>
-            <p className="text-xs text-blue-300 mt-0.5">$49/mo → fixes everything</p>
-          </div>
+        <div className="shrink-0 text-center bg-white/10 rounded-xl px-5 py-3">
+          <p className="text-blue-200 text-xs mb-0.5">Start today</p>
+          <p className="font-bold text-xl">$66–76<span className="text-sm font-normal text-blue-300">/mo</span></p>
+          <p className="text-blue-300 text-xs mt-0.5">Phase 1 total</p>
         </div>
       </div>
 
-      {/* What you need per contact */}
+      {/* ── Phase cards ── */}
+      <div className="flex flex-col gap-3">
+        {PHASES.map(phase => {
+          const isOpen = expandedPhase === phase.id;
+          const hasBuyNow = phase.items.some(i => i.status === "buy-now" || i.status === "required");
+          return (
+            <div key={phase.id} className="bg-white border rounded-xl overflow-hidden">
+              <button
+                onClick={() => setExpandedPhase(isOpen ? 0 : phase.id)}
+                className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors text-left"
+              >
+                <div className="flex items-center gap-3">
+                  <span className={`${PHASE_HEADER[phase.color]} text-white text-xs font-bold rounded-full w-7 h-7 flex items-center justify-center shrink-0`}>
+                    {phase.id}
+                  </span>
+                  <div>
+                    <p className="font-semibold text-gray-900 text-sm">{phase.label}</p>
+                    <p className="text-xs text-gray-400">{phase.sublabel}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  {hasBuyNow && !isOpen && (
+                    <span className="text-xs bg-blue-50 text-blue-600 border border-blue-200 px-2 py-0.5 rounded-full font-medium">
+                      action needed
+                    </span>
+                  )}
+                  <span className="font-bold text-gray-900 text-sm">{phase.total}</span>
+                  <span className="text-gray-400 text-sm">{isOpen ? "▲" : "▼"}</span>
+                </div>
+              </button>
+
+              {isOpen && (
+                <div className="border-t">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b bg-gray-50">
+                        <th className="text-left px-5 py-2.5 text-xs font-medium text-gray-400">Service</th>
+                        <th className="text-left px-3 py-2.5 text-xs font-medium text-gray-400">Plan</th>
+                        <th className="text-right px-4 py-2.5 text-xs font-medium text-gray-400">Cost</th>
+                        <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-400">Why</th>
+                        <th className="px-4 py-2.5"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {phase.items.map((item, i) => (
+                        <tr key={i} className="border-b last:border-0 align-top">
+                          <td className="px-5 py-3 font-semibold text-gray-900 whitespace-nowrap">{item.service}</td>
+                          <td className="px-3 py-3 text-gray-500 text-xs whitespace-nowrap">{item.plan}</td>
+                          <td className="px-4 py-3 text-right font-bold text-gray-900 whitespace-nowrap">{item.cost}</td>
+                          <td className="px-4 py-3 text-xs text-gray-500 max-w-xs">
+                            {item.why}
+                            {"note" in item && item.note && (
+                              <p className="mt-1 text-amber-600">{item.note as string}</p>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_STYLE[item.status]}`}>
+                              {STATUS_LABEL[item.status]}
+                            </span>
+                            {"link" in item && item.link && (
+                              <a href={item.link as string} target="_blank" rel="noreferrer" className="block text-xs text-blue-500 hover:underline mt-1">
+                                pricing →
+                              </a>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <div className="px-5 py-3 bg-gray-50 border-t flex items-center justify-between">
+                    <p className="text-xs text-gray-400">Total for {phase.label}</p>
+                    <p className="font-bold text-gray-900">{phase.total}<span className="text-xs font-normal text-gray-400">/mo</span></p>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ── Current stack status ── */}
+      <div className="bg-white border rounded-xl overflow-hidden">
+        <div className="px-5 py-4 border-b bg-gray-50">
+          <h2 className="font-semibold text-gray-900">Current Stack Status</h2>
+          <p className="text-xs text-gray-500 mt-0.5">What's active, what needs upgrading right now</p>
+        </div>
+        <div className="divide-y">
+          {[
+            { service: "Render", status: "⚠ Upgrade needed", detail: "Free tier spins down. Pay $7/mo for Starter to keep always-on.", color: "text-amber-500" },
+            { service: "Hunter.io", status: "⚠ Not subscribed", detail: "No active subscription. Subscribe to Outreach Platform Starter ($49/mo) to unlock API + 2,000 searches/mo.", color: "text-red-500" },
+            { service: "Apollo.io", status: "⚠ Free plan (403 errors)", detail: "API calls return 403. Upgrade to Basic (~$49–59/mo) to fix contact enrichment.", color: "text-red-500" },
+            { service: "Apify", status: "⚠ Free tier depleted", detail: "$5 free credit runs out after ~25 lookups. Upgrade to Starter ($29/mo) for consistent fallback.", color: "text-amber-500" },
+            { service: "Anthropic", status: "✓ Active", detail: "Pay-as-you-go. New API key active.", color: "text-green-600" },
+            { service: "Supabase", status: "✓ Free tier active", detail: "DB within free limits. Upgrade to Pro ($25/mo) when hitting 500 MB.", color: "text-green-600" },
+            { service: "Vercel", status: "✓ Hobby (free)", detail: "Frontend deployed. No upgrade needed until team grows.", color: "text-green-600" },
+            { service: "Gmail API", status: "✓ Active", detail: "OAuth connected. Token needs periodic refresh.", color: "text-green-600" },
+            { service: "Google Calendar API", status: "✓ Active", detail: "Meeting creation works. Token auto-refreshes.", color: "text-green-600" },
+            { service: "AgentMail", status: "✓ Free tier active", detail: "Reply inbox working. Upgrade to Developer ($20/mo) when daily cap hit.", color: "text-green-600" },
+            { service: "Tavily", status: "✓ Free tier active", detail: "1,000 searches/mo free — sufficient for current volume.", color: "text-green-600" },
+          ].map(row => (
+            <div key={row.service} className="px-5 py-3 flex items-start gap-4">
+              <p className="font-medium text-gray-900 text-sm w-40 shrink-0">{row.service}</p>
+              <p className={`text-xs font-semibold w-44 shrink-0 ${row.color}`}>{row.status}</p>
+              <p className="text-xs text-gray-500">{row.detail}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── What Owle automates ── */}
+      <div className="bg-white border rounded-xl p-5">
+        <h2 className="font-semibold text-gray-900 mb-1">What the Platform Does End-to-End</h2>
+        <p className="text-xs text-gray-500 mb-4">Every step automated — you only review before sending</p>
+        <div className="grid grid-cols-2 gap-x-8 gap-y-2">
+          {[
+            ["Search SNFs", "15,000+ CMS-verified facilities — filter by state, city, turnover, star rating"],
+            ["ICP Scoring", "0–100 fit score + priority score per facility based on pain signals"],
+            ["Contact Enrichment", "Hunter → Apollo → Apify in order, deduplicated by email"],
+            ["Email Drafting", "Personalized cold email using facility-specific CMS data"],
+            ["Approval Queue", "Review + approve before anything is sent — you stay in control"],
+            ["Gmail Sending", "Approved emails sent via Gmail API automatically"],
+            ["Reply Classification", "Interested / not now / referral / unsubscribe — auto-classified"],
+            ["Response Drafting", "AI drafts reply based on classification + conversation context"],
+            ["Meeting Booking", "Google Calendar event + Meet link created on one click"],
+            ["Pipeline Tracking", "New → Contacted → Meeting → Won/Lost across all accounts"],
+            ["Audit Log", "Every agent action logged and traceable per account"],
+            ["Learning Updater", "Strategy refined after each run based on what worked"],
+          ].map(([title, desc]) => (
+            <div key={title} className="flex gap-2 text-sm">
+              <span className="text-blue-500 shrink-0 mt-0.5">✓</span>
+              <span><strong className="text-gray-800">{title}</strong> <span className="text-gray-500 text-xs">— {desc}</span></span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Tool reference ── */}
+      <div className="bg-white border rounded-xl overflow-hidden">
+        <button
+          onClick={() => setShowTools(!showTools)}
+          className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 text-left transition-colors"
+        >
+          <div>
+            <p className="font-semibold text-gray-900 text-sm">Tool Reference — Pricing & API Details</p>
+            <p className="text-xs text-gray-400 mt-0.5">Per-tool pricing breakdown, API tiers, and caveats</p>
+          </div>
+          <span className="text-gray-400 text-sm">{showTools ? "Hide ▲" : "Show ▼"}</span>
+        </button>
+        {showTools && (
+          <div className="border-t overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-gray-50">
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-400">Tool</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-400">Role in Owle</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-400">Plan</th>
+                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-400">Cost</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-400">API Tier</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-400">Credits</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 max-w-xs">Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {TOOLS.map(t => (
+                  <tr key={t.name} className="border-b last:border-0 align-top hover:bg-gray-50">
+                    <td className="px-4 py-3 font-semibold text-gray-900 whitespace-nowrap">{t.name}</td>
+                    <td className="px-4 py-3 text-xs text-gray-600">{t.role}</td>
+                    <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{t.owle_plan}</td>
+                    <td className="px-4 py-3 text-right font-bold text-gray-900 whitespace-nowrap">{t.owle_cost}</td>
+                    <td className="px-4 py-3 text-xs text-gray-500">{t.api_tier}</td>
+                    <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{t.credits}</td>
+                    <td className="px-4 py-3 text-xs text-amber-600 max-w-xs">{t.note}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* ════════════════════════════════════════════════════════════════════════
+          PLATFORM COMPARISON — reference material
+      ════════════════════════════════════════════════════════════════════════ */}
+
+      <div className="border-t pt-6">
+        <h2 className="text-lg font-bold text-gray-900">Platform Comparison — Market Reference</h2>
+        <p className="text-sm text-gray-500 mt-1">How individual tools compare · context for choosing data sources</p>
+      </div>
+
+      {/* ── The 2 Things You Must Have ── */}
       <div className="bg-white border rounded-xl overflow-hidden">
         <div className="px-5 py-4 border-b bg-gray-50">
           <h2 className="font-semibold text-gray-900">The 2 Things You Must Have Per Contact</h2>
@@ -413,7 +781,7 @@ export default function PlatformsPage() {
         </div>
       </div>
 
-      {/* Why individual APIs vs one platform */}
+      {/* ── Individual APIs vs One Platform ── */}
       <div className="bg-white border rounded-xl overflow-hidden">
         <div className="px-5 py-4 border-b bg-gray-50">
           <h2 className="font-semibold text-gray-900">Individual APIs vs. One Platform — Which Makes Sense?</h2>
@@ -445,7 +813,7 @@ export default function PlatformsPage() {
         </div>
       </div>
 
-      {/* Cost at scale table */}
+      {/* ── Cost per 1k emails ── */}
       <div className="bg-white border rounded-xl overflow-hidden">
         <div className="px-5 py-4 border-b bg-gray-50">
           <h2 className="font-semibold text-gray-900">Cost to Get 1,000 Verified Business Emails</h2>
@@ -482,7 +850,7 @@ export default function PlatformsPage() {
         </table>
       </div>
 
-      {/* Volume comparison table */}
+      {/* ── Volume comparison ── */}
       <div className="bg-white border rounded-xl overflow-hidden">
         <div className="px-5 py-4 border-b bg-gray-50">
           <h2 className="font-semibold text-gray-900">Cost by Volume — Owle vs. Platforms Directly</h2>
@@ -536,8 +904,6 @@ export default function PlatformsPage() {
             </tbody>
           </table>
         </div>
-
-        {/* What's included legend */}
         <div className="border-t px-5 py-4 bg-gray-50">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">What's included at each price</p>
           <div className="grid grid-cols-5 gap-2 text-xs">
@@ -595,7 +961,7 @@ export default function PlatformsPage() {
         </div>
       </div>
 
-      {/* Platform summary table */}
+      {/* ── All Plans Monthly Price ── */}
       <div className="bg-white border rounded-xl overflow-hidden">
         <div className="px-5 py-4 border-b bg-gray-50">
           <h2 className="font-semibold text-gray-900">All Plans — Monthly Price</h2>
@@ -640,7 +1006,7 @@ export default function PlatformsPage() {
         </table>
       </div>
 
-      {/* Detail panel */}
+      {/* ── Detail panel ── */}
       {active && (
         <div className="bg-white border rounded-xl overflow-hidden">
           <div className="flex items-center gap-3 px-5 py-4 border-b bg-gray-50">
@@ -735,7 +1101,7 @@ export default function PlatformsPage() {
         </div>
       )}
 
-      {/* Owle stack subscriptions */}
+      {/* ── Owle stack subscriptions ── */}
       <div className="bg-white border rounded-xl overflow-hidden">
         <div className="px-5 py-4 border-b bg-gray-50">
           <h2 className="font-semibold text-gray-900">Owle Agent — What to Subscribe To</h2>
@@ -814,8 +1180,8 @@ export default function PlatformsPage() {
             <tbody>
               {[
                 { service: "Hunter.io", plan: "Starter", cost: "$49/mo", what: "2,000 domain searches/mo. Most reliable source — finds all emails at a company by domain. Primary enrichment source in Owle.", status: "recommended", color: "text-blue-600" },
-                { service: "Apify", plan: "Starter", cost: "$29/mo", what: "$29/mo + pay-as-you-go at $0.20/CU. Easy-email-finder actor ~0.5–1 CU per domain. Free $5 credit (~25–50 lookups) runs out fast — Starter gives 32 GB RAM + prepaid credits for real volume. Use as fallback when Hunter finds nothing.", status: "upgrade needed", color: "text-amber-500" },
-                { service: "Apollo.io", plan: "Basic", cost: "$49/mo", what: "1,000 export credits/mo with API access. Owle currently gets 403 because you're on the free plan — upgrading to Basic unlocks the People Search API and fixes enrichment. Organization tier adds higher rate limits + SSO.", status: "upgrade to fix", color: "text-amber-500" },
+                { service: "Apify", plan: "Starter", cost: "$29/mo", what: "$29/mo + pay-as-you-go at $0.20/CU. Easy-email-finder actor ~0.5–1 CU per domain. Free $5 credit (~25–50 lookups) runs out fast — Starter gives prepaid credits for real volume. Use as fallback when Hunter finds nothing.", status: "upgrade needed", color: "text-amber-500" },
+                { service: "Apollo.io", plan: "Basic", cost: "$49/mo", what: "1,000 export credits/mo with API access. Owle currently gets 403 because you're on the free plan — upgrading to Basic unlocks the People Search API and fixes enrichment.", status: "upgrade to fix", color: "text-amber-500" },
                 { service: "Tavily", plan: "Researcher", cost: "$0/mo", what: "1,000 search credits/mo. Used by web_enricher to find company websites + context. Free covers moderate use.", status: "active (free)", color: "text-green-600" },
               ].map(r => (
                 <tr key={r.service + r.plan} className="border-b last:border-0">
@@ -853,7 +1219,7 @@ export default function PlatformsPage() {
         </div>
       </div>
 
-      {/* Value / ROI */}
+      {/* ── Value / ROI ── */}
       <div className="bg-white border rounded-xl overflow-hidden">
         <div className="px-5 py-4 border-b bg-gray-50">
           <h2 className="font-semibold text-gray-900">Value You're Getting — What Owle Replaces</h2>
@@ -894,11 +1260,10 @@ export default function PlatformsPage() {
               ))}
             </div>
           </div>
-
         </div>
       </div>
 
-      <p className="text-xs text-gray-400 text-center pb-4">Pricing sourced from official pages · April 2026 · Subject to change · All prices in USD</p>
+      <p className="text-xs text-gray-400 text-center">Pricing sourced from official pages · April 2026 · Subject to change · All prices in USD · Monthly billing</p>
     </div>
   );
 }
