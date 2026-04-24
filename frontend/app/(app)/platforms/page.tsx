@@ -284,7 +284,7 @@ export default function PlatformsPage() {
                 { s: "Render", p: "Starter", c: "$7/mo", note: "Same" },
                 { s: "Hunter.io", p: "Starter", c: "$49/mo", note: "Same — primary source" },
                 { s: "Apollo.io", p: "Basic", c: "$49/mo", note: "Upgrade fixes API 403 — adds 1,000 more contacts/mo from 275M database" },
-                { s: "Apify", p: "Starter", c: "$49/mo", note: "Enough credits for real fallback volume" },
+                { s: "Apify", p: "Starter", c: "$29/mo", note: "Enough credits for real fallback volume" },
                 { s: "Anthropic", p: "Pay-as-you-go", c: "~$20–40/mo", note: "Higher usage as leads grow" },
               ].map(r => (
                 <div key={r.s} className="flex justify-between items-start gap-2">
@@ -299,7 +299,7 @@ export default function PlatformsPage() {
             </div>
             <div className="mt-4 pt-3 border-t border-blue-500">
               <p className="text-xs text-blue-200">Monthly total</p>
-              <p className="text-2xl font-bold text-white">~$174–194<span className="text-sm font-normal text-blue-300">/mo</span></p>
+              <p className="text-2xl font-bold text-white">~$154–174<span className="text-sm font-normal text-blue-300">/mo</span></p>
             </div>
           </div>
 
@@ -312,7 +312,7 @@ export default function PlatformsPage() {
             <p className="text-xs text-blue-200 mb-3">Production-grade infrastructure · 500–1,000+ leads/mo</p>
             <div className="flex flex-col gap-2 text-sm">
               {[
-                { s: "Phase 2 stack", p: "", c: "~$174/mo", note: "Everything from Phase 2" },
+                { s: "Phase 2 stack", p: "", c: "~$154/mo", note: "Everything from Phase 2" },
                 { s: "Supabase", p: "Pro", c: "$25/mo", note: "8 GB DB + daily backups — needed when DB grows" },
                 { s: "AgentMail", p: "Developer", c: "$20/mo", note: "Remove reply inbox daily cap" },
                 { s: "Hunter.io", p: "→ Growth", c: "$149/mo", note: "Upgrade from Starter — 10,000 searches/mo" },
@@ -438,12 +438,12 @@ export default function PlatformsPage() {
             </thead>
             <tbody>
               {[
-                { v: 10,   owle: 106, apollo: 49,  hunter: 49, snovio: 39, diy: 146 },
-                { v: 100,  owle: 110, apollo: 49,  hunter: 49, snovio: 39, diy: 146 },
-                { v: 200,  owle: 115, apollo: 49,  hunter: 49, snovio: 39, diy: 146 },
-                { v: 500,  owle: 130, apollo: 49,  hunter: 49, snovio: 39, diy: 146 },
-                { v: 700,  owle: 140, apollo: 49,  hunter: 49, snovio: 39, diy: 146 },
-                { v: 1000, owle: 155, apollo: 49,  hunter: 49, snovio: 39, diy: 146, limitNote: true },
+                { v: 10,   owle: 86,  apollo: 49,  hunter: 49, snovio: 39, diy: 146 },
+                { v: 100,  owle: 90,  apollo: 49,  hunter: 49, snovio: 39, diy: 146 },
+                { v: 200,  owle: 95,  apollo: 49,  hunter: 49, snovio: 39, diy: 146 },
+                { v: 500,  owle: 110, apollo: 49,  hunter: 49, snovio: 39, diy: 146 },
+                { v: 700,  owle: 120, apollo: 49,  hunter: 49, snovio: 39, diy: 146 },
+                { v: 1000, owle: 135, apollo: 49,  hunter: 49, snovio: 39, diy: 146, limitNote: true },
               ].map(row => (
                 <tr key={row.v} className="border-b last:border-0 hover:bg-gray-50">
                   <td className="px-4 py-3 font-bold text-gray-800">{row.v.toLocaleString()}</td>
@@ -527,7 +527,7 @@ export default function PlatformsPage() {
             ))}
           </div>
           <p className="text-xs text-amber-600 mt-3">* At 1,000 leads/mo — Apollo Basic and Snov.io Starter hit their credit cap. Upgrade to Professional ($99) and Pro S ($99) respectively.</p>
-          <p className="text-xs text-gray-400 mt-1">Owle variable cost: ~$0.05/lead (Anthropic Claude for scoring + email drafting). Fixed: Render $7 + Hunter $49 + Apify $49 = $105 base.</p>
+          <p className="text-xs text-gray-400 mt-1">Owle variable cost: ~$0.05/lead (Anthropic Claude for scoring + email drafting). Fixed: Render $7 + Hunter $49 + Apify $29 = $85 base.</p>
         </div>
       </div>
 
@@ -750,7 +750,7 @@ export default function PlatformsPage() {
             <tbody>
               {[
                 { service: "Hunter.io", plan: "Starter", cost: "$49/mo", what: "2,000 domain searches/mo. Most reliable source — finds all emails at a company by domain. Primary enrichment source in Owle.", status: "recommended", color: "text-blue-600" },
-                { service: "Apify", plan: "Starter", cost: "$49/mo", what: "~$49 in actor credits/mo. Easy-email-finder actor costs ~0.5–1 CU per domain = ~50–100 lookups on free $5 credit (not enough). Starter gives ~500–1,000 lookups. Use as fallback when Hunter finds nothing.", status: "upgrade needed", color: "text-amber-500" },
+                { service: "Apify", plan: "Starter", cost: "$29/mo", what: "$29/mo + pay-as-you-go at $0.20/CU. Easy-email-finder actor ~0.5–1 CU per domain. Free $5 credit (~25–50 lookups) runs out fast — Starter gives 32 GB RAM + prepaid credits for real volume. Use as fallback when Hunter finds nothing.", status: "upgrade needed", color: "text-amber-500" },
                 { service: "Apollo.io", plan: "Basic", cost: "$49/mo", what: "1,000 export credits/mo with API access. Owle currently gets 403 because you're on the free plan — upgrading to Basic unlocks the People Search API and fixes enrichment. Organization tier adds higher rate limits + SSO.", status: "upgrade to fix", color: "text-amber-500" },
                 { service: "Tavily", plan: "Researcher", cost: "$0/mo", what: "1,000 search credits/mo. Used by web_enricher to find company websites + context. Free covers moderate use.", status: "active (free)", color: "text-green-600" },
               ].map(r => (
@@ -777,12 +777,12 @@ export default function PlatformsPage() {
             </div>
             <div className="bg-white border-2 border-blue-200 rounded-lg p-3">
               <p className="text-xs text-blue-600 font-medium mb-1">★ Starter stack (recommended)</p>
-              <p className="text-2xl font-bold text-blue-700">$154–194<span className="text-sm font-normal text-blue-400">/mo</span></p>
-              <p className="text-xs text-gray-400 mt-1">Render $7 + Hunter $49 + Apify $49 + Anthropic ~$20–60 + Tavily $0.</p>
+              <p className="text-2xl font-bold text-blue-700">$134–174<span className="text-sm font-normal text-blue-400">/mo</span></p>
+              <p className="text-xs text-gray-400 mt-1">Render $7 + Hunter $49 + Apify $29 + Anthropic ~$20–60 + Tavily $0.</p>
             </div>
             <div className="bg-white border rounded-lg p-3">
               <p className="text-xs text-gray-500 mb-1">Growth stack (scaling)</p>
-              <p className="text-2xl font-bold text-gray-900">$244–314<span className="text-sm font-normal text-gray-400">/mo</span></p>
+              <p className="text-2xl font-bold text-gray-900">$224–294<span className="text-sm font-normal text-gray-400">/mo</span></p>
               <p className="text-xs text-gray-400 mt-1">Above + Supabase Pro $25 + AgentMail Dev $20 + higher AI usage.</p>
             </div>
           </div>
@@ -793,13 +793,13 @@ export default function PlatformsPage() {
       <div className="bg-white border rounded-xl overflow-hidden">
         <div className="px-5 py-4 border-b bg-gray-50">
           <h2 className="font-semibold text-gray-900">Value You're Getting — What Owle Replaces</h2>
-          <p className="text-xs text-gray-500 mt-0.5">At $154–194/mo, what would this cost if done manually or with traditional tools?</p>
+          <p className="text-xs text-gray-500 mt-0.5">At $134–174/mo, what would this cost if done manually or with traditional tools?</p>
         </div>
         <div className="px-5 py-4 flex flex-col gap-4">
           <div className="grid grid-cols-2 gap-4">
             {[
               { label: "Apollo Pro + Instantly Growth (do-it-yourself stack)", cost: "$147/mo", note: "Apollo Professional $99/mo + Instantly Growth $47/mo — but no AI scoring, no auto-outreach, no reply handling.", color: "bg-yellow-50 border-yellow-100" },
-              { label: "Owle Agent starter stack", cost: "$154–194/mo", note: "Everything automated: CMS search → ICP scoring → personalized email drafts → reply classification → meeting booking.", color: "bg-blue-50 border-blue-200" },
+              { label: "Owle Agent starter stack", cost: "$134–174/mo", note: "Everything automated: CMS search → ICP scoring → personalized email drafts → reply classification → meeting booking.", color: "bg-blue-50 border-blue-200" },
             ].map(item => (
               <div key={item.label} className={`border rounded-lg p-4 ${item.color}`}>
                 <p className="text-xs font-medium text-gray-600 mb-1">{item.label}</p>
