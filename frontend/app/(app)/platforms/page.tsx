@@ -347,6 +347,72 @@ export default function PlatformsPage() {
         </div>
       </div>
 
+      {/* What you need per contact */}
+      <div className="bg-white border rounded-xl overflow-hidden">
+        <div className="px-5 py-4 border-b bg-gray-50">
+          <h2 className="font-semibold text-gray-900">The 2 Things You Must Have Per Contact</h2>
+          <p className="text-xs text-gray-500 mt-0.5">Everything else is optional — these two are required for outreach to work</p>
+        </div>
+        <div className="grid grid-cols-2 divide-x">
+          <div className="px-5 py-5 flex flex-col gap-2">
+            <div className="flex items-center gap-3 mb-1">
+              <span className="text-2xl">📧</span>
+              <div>
+                <p className="font-bold text-gray-900">Email Address</p>
+                <p className="text-xs text-gray-500">To send cold outreach · Owle drafts + sends automatically</p>
+              </div>
+            </div>
+            <div className="flex flex-col gap-1.5 mt-1">
+              {[
+                { tool: "Hunter.io Starter", gives: "Up to 2,000 emails/mo via domain search", quality: "High — verified", color: "text-green-700 bg-green-50", badge: "best" },
+                { tool: "Apollo Basic", gives: "Up to 1,000 emails/mo from 275M database", quality: "High — verified", color: "text-green-700 bg-green-50", badge: "good" },
+                { tool: "Apify Starter", gives: "Scraped emails from company domain", quality: "Medium — unverified", color: "text-yellow-700 bg-yellow-50", badge: "fallback" },
+                { tool: "Snov.io Starter", gives: "Up to 1,000 emails/mo", quality: "High — verified", color: "text-green-700 bg-green-50", badge: "" },
+              ].map(r => (
+                <div key={r.tool} className="flex items-start justify-between gap-3 py-2 border-b last:border-0">
+                  <div>
+                    <p className="text-sm font-medium text-gray-800">{r.tool}</p>
+                    <p className="text-xs text-gray-500">{r.gives}</p>
+                    <p className={`text-xs font-medium mt-0.5 px-1.5 py-0.5 rounded inline-block ${r.color}`}>{r.quality}</p>
+                  </div>
+                  {r.badge && <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full shrink-0 mt-0.5">{r.badge}</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="px-5 py-5 flex flex-col gap-2">
+            <div className="flex items-center gap-3 mb-1">
+              <span className="text-2xl">🔗</span>
+              <div>
+                <p className="font-bold text-gray-900">LinkedIn Profile URL</p>
+                <p className="text-xs text-gray-500">To send LinkedIn message · Copy message + open profile in one click</p>
+              </div>
+            </div>
+            <div className="flex flex-col gap-1.5 mt-1">
+              {[
+                { tool: "Hunter.io Starter", gives: "Returns LinkedIn URL when found via domain search", quality: "Included — when available", color: "text-green-700 bg-green-50", badge: "best" },
+                { tool: "Apollo Basic", gives: "LinkedIn URL for most contacts in database", quality: "High coverage — 275M profiles", color: "text-green-700 bg-green-50", badge: "good" },
+                { tool: "Apify Starter", gives: "Email only — no LinkedIn URL returned", quality: "Not available", color: "text-red-600 bg-red-50", badge: "email only" },
+                { tool: "Snov.io Starter", gives: "Limited LinkedIn data on lower plans", quality: "Partial", color: "text-yellow-700 bg-yellow-50", badge: "" },
+              ].map(r => (
+                <div key={r.tool} className="flex items-start justify-between gap-3 py-2 border-b last:border-0">
+                  <div>
+                    <p className="text-sm font-medium text-gray-800">{r.tool}</p>
+                    <p className="text-xs text-gray-500">{r.gives}</p>
+                    <p className={`text-xs font-medium mt-0.5 px-1.5 py-0.5 rounded inline-block ${r.color}`}>{r.quality}</p>
+                  </div>
+                  {r.badge && <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full shrink-0 mt-0.5">{r.badge}</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="px-5 py-3 bg-amber-50 border-t border-amber-100 flex items-center gap-3">
+          <span className="text-amber-500 text-lg shrink-0">→</span>
+          <p className="text-sm text-amber-800"><strong>Hunter + Apollo together</strong> gives the best email + LinkedIn coverage. Hunter finds emails by domain (high accuracy), Apollo adds LinkedIn URLs and fills gaps from its 275M contact database. Together they cover ~90% of SNF decision-makers.</p>
+        </div>
+      </div>
+
       {/* Why individual APIs vs one platform */}
       <div className="bg-white border rounded-xl overflow-hidden">
         <div className="px-5 py-4 border-b bg-gray-50">
