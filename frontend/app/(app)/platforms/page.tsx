@@ -478,6 +478,176 @@ export default function PlatformsPage() {
         </div>
       )}
 
+      {/* Owle stack subscriptions */}
+      <div className="bg-white border rounded-xl overflow-hidden">
+        <div className="px-5 py-4 border-b bg-gray-50">
+          <h2 className="font-semibold text-gray-900">Owle Agent — What to Subscribe To</h2>
+          <p className="text-xs text-gray-500 mt-0.5">Monthly billing · starter plans only · what you actually need to run Owle</p>
+        </div>
+
+        {/* Infrastructure */}
+        <div className="px-5 py-3 border-b">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Infrastructure (Required)</p>
+          <table className="w-full text-sm">
+            <tbody>
+              {[
+                { service: "Render", plan: "Starter Web Service", cost: "$7/mo", what: "Backend (FastAPI). Free tier spins down after inactivity — pay $7/mo to stay always-on.", status: "required", color: "text-red-600" },
+                { service: "Supabase", plan: "Free tier", cost: "$0/mo", what: "Postgres DB, real-time subscriptions, auth. Free covers 500 MB + 50k MAU — enough for early stage.", status: "free now", color: "text-green-600" },
+                { service: "Supabase", plan: "Pro (when scaling)", cost: "$25/mo", what: "Needed when DB hits 500 MB or traffic grows. Unlocks 8 GB storage, daily backups, no pausing.", status: "later", color: "text-gray-400" },
+                { service: "Vercel", plan: "Hobby (free)", cost: "$0/mo", what: "Frontend hosting. Free handles custom domains + unlimited deploys. Upgrade to Pro ($20/mo) only when team grows.", status: "free now", color: "text-green-600" },
+              ].map(r => (
+                <tr key={r.service + r.plan} className="border-b last:border-0">
+                  <td className="py-2.5 pr-3 font-medium text-gray-800 w-28">{r.service}</td>
+                  <td className="py-2.5 pr-3 text-gray-500 text-xs w-40">{r.plan}</td>
+                  <td className="py-2.5 pr-4 font-bold text-gray-900 w-20">{r.cost}</td>
+                  <td className="py-2.5 pr-4 text-gray-500 text-xs">{r.what}</td>
+                  <td className={`py-2.5 text-xs font-medium whitespace-nowrap ${r.color}`}>{r.status}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* AI */}
+        <div className="px-5 py-3 border-b">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">AI (Required — Pay Per Use)</p>
+          <table className="w-full text-sm">
+            <tbody>
+              {[
+                { service: "Anthropic API", plan: "Claude Sonnet 4.6", cost: "~$20–60/mo", what: "Used for: ICP scoring, email drafting, reply classification, stakeholder mapping, meeting notes. $3/M input tokens, $15/M output. 100 accounts/mo ≈ ~$5–15; 500 accounts ≈ ~$25–60.", status: "pay-as-you-go", color: "text-blue-600" },
+              ].map(r => (
+                <tr key={r.service} className="border-b last:border-0">
+                  <td className="py-2.5 pr-3 font-medium text-gray-800 w-28">{r.service}</td>
+                  <td className="py-2.5 pr-3 text-gray-500 text-xs w-40">{r.plan}</td>
+                  <td className="py-2.5 pr-4 font-bold text-gray-900 w-20">{r.cost}</td>
+                  <td className="py-2.5 pr-4 text-gray-500 text-xs">{r.what}</td>
+                  <td className={`py-2.5 text-xs font-medium whitespace-nowrap ${r.color}`}>{r.status}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Email & Calendar */}
+        <div className="px-5 py-3 border-b">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Email & Calendar (Free APIs)</p>
+          <table className="w-full text-sm">
+            <tbody>
+              {[
+                { service: "Gmail API", plan: "Google Workspace or personal", cost: "$0/mo", what: "Reading emails, sending outreach. Free within Google's quotas (daily send limit applies).", status: "free", color: "text-green-600" },
+                { service: "Google Calendar API", plan: "OAuth2 access", cost: "$0/mo", what: "Creating meeting events + Google Meet links. Free within quota.", status: "free", color: "text-green-600" },
+                { service: "AgentMail", plan: "Free tier", cost: "$0/mo", what: "Managed inboxes for receiving replies. Free gives 3 inboxes, 3,000 emails/mo. Developer plan ($20/mo) removes daily cap for higher volume.", status: "free now", color: "text-green-600" },
+              ].map(r => (
+                <tr key={r.service} className="border-b last:border-0">
+                  <td className="py-2.5 pr-3 font-medium text-gray-800 w-28">{r.service}</td>
+                  <td className="py-2.5 pr-3 text-gray-500 text-xs w-40">{r.plan}</td>
+                  <td className="py-2.5 pr-4 font-bold text-gray-900 w-20">{r.cost}</td>
+                  <td className="py-2.5 pr-4 text-gray-500 text-xs">{r.what}</td>
+                  <td className={`py-2.5 text-xs font-medium whitespace-nowrap ${r.color}`}>{r.status}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Data / Enrichment */}
+        <div className="px-5 py-3 border-b">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Contact Enrichment (Optional Upgrades)</p>
+          <table className="w-full text-sm">
+            <tbody>
+              {[
+                { service: "Hunter.io", plan: "Free", cost: "$0/mo", what: "25 searches/mo via domain. Enough for testing. Hit the button per account.", status: "active (free)", color: "text-green-600" },
+                { service: "Hunter.io", plan: "Starter (when scaling)", cost: "$49/mo", what: "2,000 searches/mo. Upgrade when running enrichment on 50+ new accounts per month.", status: "upgrade later", color: "text-gray-400" },
+                { service: "Apify", plan: "Free ($5 credit)", cost: "$0/mo", what: "Email scraping via company domain (easy-email-finder actor). Free $5/mo credit covers ~50–100 domain lookups.", status: "active (free)", color: "text-green-600" },
+                { service: "Apollo.io", plan: "Free", cost: "$0/mo", what: "50 export credits/mo via web app. API access requires custom/Org plan — skip until at scale.", status: "limited", color: "text-amber-500" },
+                { service: "Tavily", plan: "Researcher (free)", cost: "$0/mo", what: "1,000 search credits/mo. Used by web_enricher to find company websites + context. Free covers moderate use.", status: "active (free)", color: "text-green-600" },
+              ].map(r => (
+                <tr key={r.service + r.plan} className="border-b last:border-0">
+                  <td className="py-2.5 pr-3 font-medium text-gray-800 w-28">{r.service}</td>
+                  <td className="py-2.5 pr-3 text-gray-500 text-xs w-40">{r.plan}</td>
+                  <td className="py-2.5 pr-4 font-bold text-gray-900 w-20">{r.cost}</td>
+                  <td className="py-2.5 pr-4 text-gray-500 text-xs">{r.what}</td>
+                  <td className={`py-2.5 text-xs font-medium whitespace-nowrap ${r.color}`}>{r.status}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Totals */}
+        <div className="px-5 py-4 bg-gray-50">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Monthly Total</p>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="bg-white border rounded-lg p-3">
+              <p className="text-xs text-gray-500 mb-1">Minimum (free tiers only)</p>
+              <p className="text-2xl font-bold text-gray-900">$7<span className="text-sm font-normal text-gray-400">/mo</span></p>
+              <p className="text-xs text-gray-400 mt-1">Render only. AI usage extra (pay-as-you-go).</p>
+            </div>
+            <div className="bg-white border-2 border-blue-200 rounded-lg p-3">
+              <p className="text-xs text-blue-600 font-medium mb-1">★ Starter stack (recommended)</p>
+              <p className="text-2xl font-bold text-blue-700">$56–96<span className="text-sm font-normal text-blue-400">/mo</span></p>
+              <p className="text-xs text-gray-400 mt-1">Render $7 + Anthropic ~$20–60 + free everything else.</p>
+            </div>
+            <div className="bg-white border rounded-lg p-3">
+              <p className="text-xs text-gray-500 mb-1">Growth stack (scaling)</p>
+              <p className="text-2xl font-bold text-gray-900">$150–200<span className="text-sm font-normal text-gray-400">/mo</span></p>
+              <p className="text-xs text-gray-400 mt-1">Above + Supabase Pro $25 + Hunter $49 + AgentMail Dev $20.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Value / ROI */}
+      <div className="bg-white border rounded-xl overflow-hidden">
+        <div className="px-5 py-4 border-b bg-gray-50">
+          <h2 className="font-semibold text-gray-900">Value You're Getting — What Owle Replaces</h2>
+          <p className="text-xs text-gray-500 mt-0.5">At $56–96/mo, what would this cost if done manually or with traditional tools?</p>
+        </div>
+        <div className="px-5 py-4 flex flex-col gap-4">
+          <div className="grid grid-cols-2 gap-4">
+            {[
+              { label: "SDR Salary (1 rep doing same work)", cost: "$4,500–6,700/mo", note: "Junior SDR: $55–80K/yr fully loaded. Does: research, list building, email writing, follow-ups, meeting scheduling.", color: "bg-red-50 border-red-100" },
+              { label: "Manual list building (CMS + Google + LinkedIn)", cost: "$500–1,500/mo", note: "VA or freelancer doing manual SNF research at $15–25/hr × 40–100 hrs/mo.", color: "bg-orange-50 border-orange-100" },
+              { label: "Apollo Pro + Instantly Growth (do-it-yourself stack)", cost: "$147/mo", note: "Apollo Professional $99/mo + Instantly Growth $47/mo — but no AI scoring, no auto-outreach, no reply handling.", color: "bg-yellow-50 border-yellow-100" },
+              { label: "Owle Agent starter stack", cost: "$56–96/mo", note: "Everything automated: CMS search → ICP scoring → personalized email drafts → reply classification → meeting booking.", color: "bg-blue-50 border-blue-200" },
+            ].map(item => (
+              <div key={item.label} className={`border rounded-lg p-4 ${item.color}`}>
+                <p className="text-xs font-medium text-gray-600 mb-1">{item.label}</p>
+                <p className="text-xl font-bold text-gray-900 mb-2">{item.cost}</p>
+                <p className="text-xs text-gray-500">{item.note}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="border rounded-lg p-4">
+            <p className="text-sm font-semibold text-gray-800 mb-3">What Owle automates end-to-end</p>
+            <div className="grid grid-cols-2 gap-x-8 gap-y-1.5">
+              {[
+                "Search 15,000+ CMS-verified SNFs by state, city, turnover, star rating",
+                "ICP scoring (0–100) and priority scoring per facility",
+                "Personalized cold email drafts using facility-specific pain signals",
+                "Outreach approval queue — review before sending",
+                "Inbound reply classification (interested / not a fit / needs info)",
+                "Auto-draft responses to replies using context",
+                "Meeting booking with Google Calendar + Meet link injection",
+                "Contact enrichment via Hunter.io, Apollo, Apify",
+                "Audit log per account — every action traceable",
+                "Deal pipeline tracking (new → contacted → meeting → won/lost)",
+              ].map(item => (
+                <div key={item} className="flex gap-2 text-sm text-gray-700">
+                  <span className="text-blue-500 shrink-0 mt-0.5">✓</span>{item}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-green-50 border border-green-100 rounded-lg px-4 py-3">
+            <p className="text-sm font-semibold text-green-800 mb-1">Bottom line</p>
+            <p className="text-sm text-green-700">Owle at <strong>$56–96/mo</strong> replaces ~<strong>$5,000–8,000/mo</strong> in human SDR + tool costs. One closed SNF contract (typically $10–50K/year) pays for 1–2 years of the entire stack.</p>
+          </div>
+        </div>
+      </div>
+
       <p className="text-xs text-gray-400 text-center pb-4">Pricing sourced from official pages · April 2026 · Subject to change · All prices in USD</p>
     </div>
   );
