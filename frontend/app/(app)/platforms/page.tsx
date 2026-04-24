@@ -230,6 +230,125 @@ export default function PlatformsPage() {
         <p className="text-sm text-gray-500 mt-1">Real pricing from official sources · April 2026 · All prices shown per month</p>
       </div>
 
+      {/* Best solution recommendation */}
+      <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl overflow-hidden text-white">
+        <div className="px-5 py-4 border-b border-blue-500">
+          <div className="flex items-center gap-2">
+            <span className="text-lg">★</span>
+            <h2 className="font-bold text-white">Best Solution — What You Should Actually Do</h2>
+          </div>
+          <p className="text-xs text-blue-200 mt-0.5">Recommended action plan for Owle based on your current setup and budget</p>
+        </div>
+
+        <div className="grid grid-cols-3 divide-x divide-blue-500">
+          {/* Phase 1 */}
+          <div className="px-5 py-4">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="bg-blue-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">Phase 1</span>
+              <span className="text-sm font-semibold text-white">Start Now</span>
+            </div>
+            <p className="text-xs text-blue-200 mb-3">Get Owle fully working · &lt;100 leads/mo</p>
+            <div className="flex flex-col gap-2 text-sm">
+              {[
+                { s: "Render", p: "Starter", c: "$7/mo", note: "Keep backend always-on" },
+                { s: "Hunter.io", p: "Starter", c: "$49/mo", note: "Fixes enrichment — 2,000 searches/mo" },
+                { s: "Anthropic", p: "Pay-as-you-go", c: "~$10–20/mo", note: "ICP scoring + email drafts" },
+                { s: "Apify", p: "Free credit", c: "$0/mo", note: "Fallback email scraping" },
+                { s: "Apollo.io", p: "Skip for now", c: "$0/mo", note: "Web UI only — free plan 403s API" },
+              ].map(r => (
+                <div key={r.s} className="flex justify-between items-start gap-2">
+                  <div>
+                    <span className="font-medium text-white">{r.s}</span>
+                    <span className="text-blue-300 ml-1 text-xs">{r.p}</span>
+                    <p className="text-xs text-blue-200">{r.note}</p>
+                  </div>
+                  <span className="font-bold text-white whitespace-nowrap text-sm">{r.c}</span>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 pt-3 border-t border-blue-500">
+              <p className="text-xs text-blue-200">Monthly total</p>
+              <p className="text-2xl font-bold text-white">~$66–76<span className="text-sm font-normal text-blue-300">/mo</span></p>
+            </div>
+          </div>
+
+          {/* Phase 2 */}
+          <div className="px-5 py-4">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="bg-white text-blue-700 text-xs font-bold px-2 py-0.5 rounded-full">Phase 2</span>
+              <span className="text-sm font-semibold text-white">Scale Up</span>
+            </div>
+            <p className="text-xs text-blue-200 mb-3">Higher volume + 3 enrichment sources · 100–500 leads/mo</p>
+            <div className="flex flex-col gap-2 text-sm">
+              {[
+                { s: "Render", p: "Starter", c: "$7/mo", note: "Same" },
+                { s: "Hunter.io", p: "Starter", c: "$49/mo", note: "Same — primary source" },
+                { s: "Apollo.io", p: "Basic", c: "$49/mo", note: "Upgrade fixes API 403 — adds 1,000 more contacts/mo from 275M database" },
+                { s: "Apify", p: "Starter", c: "$49/mo", note: "Enough credits for real fallback volume" },
+                { s: "Anthropic", p: "Pay-as-you-go", c: "~$20–40/mo", note: "Higher usage as leads grow" },
+              ].map(r => (
+                <div key={r.s} className="flex justify-between items-start gap-2">
+                  <div>
+                    <span className="font-medium text-white">{r.s}</span>
+                    <span className="text-blue-300 ml-1 text-xs">{r.p}</span>
+                    <p className="text-xs text-blue-200">{r.note}</p>
+                  </div>
+                  <span className="font-bold text-white whitespace-nowrap text-sm">{r.c}</span>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 pt-3 border-t border-blue-500">
+              <p className="text-xs text-blue-200">Monthly total</p>
+              <p className="text-2xl font-bold text-white">~$174–194<span className="text-sm font-normal text-blue-300">/mo</span></p>
+            </div>
+          </div>
+
+          {/* Phase 3 */}
+          <div className="px-5 py-4">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="bg-blue-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">Phase 3</span>
+              <span className="text-sm font-semibold text-white">Full Growth</span>
+            </div>
+            <p className="text-xs text-blue-200 mb-3">Production-grade infrastructure · 500–1,000+ leads/mo</p>
+            <div className="flex flex-col gap-2 text-sm">
+              {[
+                { s: "Phase 2 stack", p: "", c: "~$174/mo", note: "Everything from Phase 2" },
+                { s: "Supabase", p: "Pro", c: "$25/mo", note: "8 GB DB + daily backups — needed when DB grows" },
+                { s: "AgentMail", p: "Developer", c: "$20/mo", note: "Remove reply inbox daily cap" },
+                { s: "Hunter.io", p: "→ Growth", c: "$149/mo", note: "Upgrade from Starter — 10,000 searches/mo" },
+                { s: "Anthropic", p: "Pay-as-you-go", c: "~$50–100/mo", note: "Full pipeline at scale" },
+              ].map(r => (
+                <div key={r.s} className="flex justify-between items-start gap-2">
+                  <div>
+                    <span className="font-medium text-white">{r.s}</span>
+                    {r.p && <span className="text-blue-300 ml-1 text-xs">{r.p}</span>}
+                    <p className="text-xs text-blue-200">{r.note}</p>
+                  </div>
+                  <span className="font-bold text-white whitespace-nowrap text-sm">{r.c}</span>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 pt-3 border-t border-blue-500">
+              <p className="text-xs text-blue-200">Monthly total</p>
+              <p className="text-2xl font-bold text-white">~$368–468<span className="text-sm font-normal text-blue-300">/mo</span></p>
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom callout */}
+        <div className="px-5 py-3 bg-blue-800/40 flex items-start gap-4">
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-white mb-0.5">The math is simple</p>
+            <p className="text-xs text-blue-200">One closed SNF contract = $10,000–50,000/year. Phase 1 stack at $66/mo = <strong className="text-white">$792/year</strong>. A single deal pays for <strong className="text-white">12–60 years</strong> of the stack. Start with Phase 1 today — upgrade only when volume demands it.</p>
+          </div>
+          <div className="shrink-0 bg-blue-500/50 rounded-lg px-4 py-2 text-center">
+            <p className="text-xs text-blue-200">Do right now</p>
+            <p className="text-sm font-bold text-white">Subscribe to<br/>Hunter Starter</p>
+            <p className="text-xs text-blue-300 mt-0.5">$49/mo → fixes everything</p>
+          </div>
+        </div>
+      </div>
+
       {/* Why individual APIs vs one platform */}
       <div className="bg-white border rounded-xl overflow-hidden">
         <div className="px-5 py-4 border-b bg-gray-50">
