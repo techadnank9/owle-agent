@@ -10,7 +10,8 @@ ASSESS_MEETING_TOOL = {
         "properties": {
             "meeting_status": {
                 "type": "string",
-                "enum": ["confirmed", "proposed", "soft_interest", "not_applicable"]
+                "enum": ["proposed", "soft_interest", "not_applicable"],
+                "description": "proposed = explicit time/date mentioned; soft_interest = interested but no specific time; not_applicable = no meeting intent"
             },
             "next_steps": {"type": "string"},
             "rationale": {"type": "string"}
@@ -59,10 +60,13 @@ Call assess_meeting_intent."""
         meeting_status, next_steps, rationale = "soft_interest", "Follow up manually", "Could not assess"
     else:
         meeting_status = tool_use.input["meeting_status"]
+        # Enforce: agent can never set confirmed — only the user can confirm via UI
+        if meeting_status == "confirmed":
+            meeting_status = "proposed"
         next_steps = tool_use.input["next_steps"]
         rationale = tool_use.input["rationale"]
 
-    if meeting_status in ("confirmed", "proposed", "soft_interest"):
+    if meeting_status in ("proposed", "soft_interest"):
         existing = (
             get_supabase().table("meetings")
             .select("id, status")

@@ -9,6 +9,44 @@ from ..claude import call_claude
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
+
+def _inject_meet_link(draft: str, meet_link: str) -> str:
+    if meet_link in draft:
+        return draft
+    link_line = f"Join via Google Meet: {meet_link}"
+    for sign_off in ("Best,", "Best regards,", "Looking forward", "Thanks,", "Thank you,", "Regards,", "Cheers,"):
+        if sign_off in draft:
+            idx = draft.index(sign_off)
+            return draft[:idx] + link_line + "\n\n" + draft[idx:]
+    return draft.rstrip() + f"\n\n{link_line}"
+
+
+def _update_reply_draft_with_meet_link(supabase, account_id: str, meet_link: str) -> None:
+    """Find the latest reply for this account and insert the Meet link into its response_draft."""
+    try:
+        oa_res = supabase.table("outreach_actions").select("id").eq("account_id", account_id).execute()
+        oa_ids = [r["id"] for r in (oa_res.data or [])]
+        if not oa_ids:
+            return
+        reply_res = (
+            supabase.table("replies")
+            .select("id, response_draft")
+            .in_("outreach_action_id", oa_ids)
+            .not_.is_("response_draft", "null")
+            .order("received_at", ascending=False)
+            .limit(1)
+            .execute()
+        )
+        if not reply_res.data:
+            return
+        reply = reply_res.data[0]
+        updated = _inject_meet_link(reply["response_draft"], meet_link)
+        if updated != reply["response_draft"]:
+            supabase.table("replies").update({"response_draft": updated}).eq("id", reply["id"]).execute()
+    except Exception as e:
+        logger.warning("Could not inject meet link into reply draft: %s", e)
+
+
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
@@ -73,9 +111,17 @@ def book_meeting(body: BookMeetingRequest):
             location=acct_location,
         )
         meet_link = calendar_result.get("meet_link")
-        if meet_link and meeting_id:
-            supabase.table("meetings").update({"calendar_link": meet_link}) \
-                .eq("id", meeting_id).execute()
+        cal_event_id = calendar_result.get("event_id")
+        if meeting_id:
+            update_payload = {}
+            if meet_link:
+                update_payload["calendar_link"] = meet_link
+            if cal_event_id:
+                update_payload["calendar_event_id"] = cal_event_id
+            if update_payload:
+                supabase.table("meetings").update(update_payload).eq("id", meeting_id).execute()
+        if meet_link:
+            _update_reply_draft_with_meet_link(supabase, body.account_id, meet_link)
     except Exception as e:
         logger.warning("Calendar event creation failed: %s", e)
 
@@ -148,7 +194,159 @@ def confirm_meeting(meeting_id: str):
 
     supabase.table("accounts").update({"status": "meeting_booked"}).eq("id", meeting["account_id"]).execute()
 
-    return {"status": "confirmed", "meeting_id": meeting_id}
+    # Create Google Calendar event if not already done
+    meet_link = meeting.get("calendar_link")
+    if not meet_link:
+        try:
+            contact_res = (
+                supabase.table("contacts")
+                .select("id, email, name")
+                .eq("account_id", meeting["account_id"])
+                .limit(1)
+                .execute()
+            )
+            contact = contact_res.data[0] if contact_res.data else {}
+
+            acct_res = supabase.table("accounts").select("name, location").eq("id", meeting["account_id"]).limit(1).execute()
+            acct_name = acct_res.data[0]["name"] if acct_res.data else "Prospect"
+            acct_location = acct_res.data[0].get("location") if acct_res.data else None
+
+            proposed_times = meeting.get("proposed_times") or []
+            proposed_time_str = proposed_times[0] if proposed_times else "TBD"
+
+            from ..calendar_client import create_meeting_event
+            calendar_result = create_meeting_event(
+                summary=f"Owle AI × {acct_name}",
+                proposed_time_str=proposed_time_str,
+                attendee_email=contact.get("email"),
+                location=acct_location,
+            )
+            meet_link = calendar_result.get("meet_link")
+            if meet_link:
+                supabase.table("meetings").update({"calendar_link": meet_link}).eq("id", meeting_id).execute()
+                _update_reply_draft_with_meet_link(supabase, meeting["account_id"], meet_link)
+        except Exception as e:
+            logger.warning("Calendar event creation failed during confirm: %s", e)
+
+    return {"status": "confirmed", "meeting_id": meeting_id, "meet_link": meet_link}
+
+
+class UpdateTimeRequest(BaseModel):
+    proposed_time: str       # human-readable display string stored in proposed_times
+    start_iso: str = ""      # YYYY-MM-DDTHH:MM — used for calendar event creation
+    duration_minutes: int = 30
+    timezone: str = ""
+
+
+@router.patch("/{meeting_id}/time")
+def update_meeting_time(meeting_id: str, body: UpdateTimeRequest):
+    supabase = get_supabase()
+    result = supabase.table("meetings").select("*").eq("id", meeting_id).limit(1).execute()
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+
+    meeting = result.data[0]
+    supabase.table("meetings").update({
+        "proposed_times": [body.proposed_time],
+    }).eq("id", meeting_id).execute()
+
+    meet_link = meeting.get("calendar_link")
+    existing_event_id = meeting.get("calendar_event_id")
+
+    try:
+        contact_res = (
+            supabase.table("contacts")
+            .select("id, email, name")
+            .eq("account_id", meeting["account_id"])
+            .limit(1)
+            .execute()
+        )
+        contact = contact_res.data[0] if contact_res.data else {}
+
+        acct_res = supabase.table("accounts").select("name, location").eq("id", meeting["account_id"]).limit(1).execute()
+        acct_name = acct_res.data[0]["name"] if acct_res.data else "Prospect"
+        acct_location = acct_res.data[0].get("location") if acct_res.data else None
+
+        time_str = body.start_iso or body.proposed_time
+        tz_override = body.timezone or None
+
+        if existing_event_id:
+            from ..calendar_client import update_meeting_event
+            calendar_result = update_meeting_event(
+                event_id=existing_event_id,
+                summary=f"Owle AI × {acct_name}",
+                proposed_time_str=time_str,
+                attendee_email=contact.get("email"),
+                duration_minutes=body.duration_minutes,
+                timezone_override=tz_override,
+                location=acct_location,
+            )
+        else:
+            from ..calendar_client import create_meeting_event
+            calendar_result = create_meeting_event(
+                summary=f"Owle AI × {acct_name}",
+                proposed_time_str=time_str,
+                attendee_email=contact.get("email"),
+                duration_minutes=body.duration_minutes,
+                location=acct_location,
+                timezone_override=tz_override,
+            )
+            new_event_id = calendar_result.get("event_id")
+            if new_event_id:
+                supabase.table("meetings").update({"calendar_event_id": new_event_id}).eq("id", meeting_id).execute()
+
+        new_meet_link = calendar_result.get("meet_link")
+        if new_meet_link:
+            meet_link = new_meet_link
+            supabase.table("meetings").update({"calendar_link": meet_link}).eq("id", meeting_id).execute()
+            _update_reply_draft_with_meet_link(supabase, meeting["account_id"], meet_link)
+    except Exception as e:
+        logger.warning("Calendar event update failed: %s", e)
+
+    return {"status": "updated", "proposed_time": body.proposed_time, "meet_link": meet_link}
+
+
+@router.post("/{meeting_id}/create-calendar-event")
+def create_calendar_event(meeting_id: str):
+    supabase = get_supabase()
+    result = supabase.table("meetings").select("*").eq("id", meeting_id).limit(1).execute()
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+
+    meeting = result.data[0]
+
+    contact_res = (
+        supabase.table("contacts")
+        .select("id, email, name")
+        .eq("account_id", meeting["account_id"])
+        .limit(1)
+        .execute()
+    )
+    contact = contact_res.data[0] if contact_res.data else {}
+
+    acct_res = supabase.table("accounts").select("name, location").eq("id", meeting["account_id"]).limit(1).execute()
+    acct_name = acct_res.data[0]["name"] if acct_res.data else "Prospect"
+    acct_location = acct_res.data[0].get("location") if acct_res.data else None
+
+    proposed_times = meeting.get("proposed_times") or []
+    proposed_time_str = proposed_times[0] if proposed_times else "TBD"
+
+    try:
+        from ..calendar_client import create_meeting_event
+        calendar_result = create_meeting_event(
+            summary=f"Owle AI × {acct_name}",
+            proposed_time_str=proposed_time_str,
+            attendee_email=contact.get("email"),
+            location=acct_location,
+        )
+        meet_link = calendar_result.get("meet_link")
+        if meet_link:
+            supabase.table("meetings").update({"calendar_link": meet_link}).eq("id", meeting_id).execute()
+            _update_reply_draft_with_meet_link(supabase, meeting["account_id"], meet_link)
+        return {"status": "created", "meet_link": meet_link}
+    except Exception as e:
+        logger.error("Calendar event creation failed: %s", e)
+        raise HTTPException(status_code=500, detail=f"Calendar error: {e}")
 
 
 @router.post("/{meeting_id}/cancel")

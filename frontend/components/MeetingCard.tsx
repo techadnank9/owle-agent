@@ -1,8 +1,58 @@
 "use client";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { confirmMeeting, cancelMeeting, completeMeeting, generateMeetingNotes } from "@/lib/api";
+import { confirmMeeting, cancelMeeting, completeMeeting, generateMeetingNotes, createCalendarEvent, updateMeetingTime } from "@/lib/api";
 import Link from "next/link";
+
+const TIMEZONES = [
+  { value: "America/New_York",    label: "Eastern Time — New York" },
+  { value: "America/Chicago",     label: "Central Time — Chicago" },
+  { value: "America/Denver",      label: "Mountain Time — Denver" },
+  { value: "America/Los_Angeles", label: "Pacific Time — Los Angeles" },
+  { value: "America/Phoenix",     label: "Mountain Time — Phoenix (no DST)" },
+  { value: "America/Anchorage",   label: "Alaska Time — Anchorage" },
+  { value: "Pacific/Honolulu",    label: "Hawaii Time — Honolulu" },
+];
+
+function defaultTz(): string {
+  const local = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return TIMEZONES.find(t => t.value === local)?.value ?? "America/Los_Angeles";
+}
+
+function tomorrow10am(): { date: string; start: string; end: string } {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  const date = d.toISOString().split("T")[0];
+  return { date, start: "10:00", end: "10:30" };
+}
+
+function parseExistingTime(s: string): { date: string; start: string; end: string } | null {
+  const iso = s.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/);
+  if (iso) {
+    const [h, m] = iso[2].split(":").map(Number);
+    const endH = Math.floor((h * 60 + m + 30) / 60) % 24;
+    const endM = (m + 30) % 60;
+    return {
+      date: iso[1],
+      start: iso[2],
+      end: `${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}`,
+    };
+  }
+  return null;
+}
+
+function fmt12(time24: string): string {
+  const [h, m] = time24.split(":").map(Number);
+  const ampm = h < 12 ? "am" : "pm";
+  const h12 = h % 12 || 12;
+  return `${h12}:${String(m).padStart(2, "0")}${ampm}`;
+}
+
+function buildDisplayString(date: string, start: string, end: string): string {
+  const d = new Date(`${date}T${start}`);
+  const dateStr = d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  return `${dateStr} ${fmt12(start)} – ${fmt12(end)}`;
+}
 
 type Meeting = {
   id: string;
@@ -38,6 +88,20 @@ type Outcome = "won" | "lost" | "nurture";
 export function MeetingCard({ meeting, onUpdate }: { meeting: Meeting; onUpdate: () => void }) {
   const [confirming, setConfirming] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [creatingEvent, setCreatingEvent] = useState(false);
+  const [calLink, setCalLink] = useState<string | null>(meeting.calendar_link);
+  const [editingTime, setEditingTime] = useState(false);
+  const [savingTime, setSavingTime] = useState(false);
+  const [proposedTimes, setProposedTimes] = useState<string[]>(meeting.proposed_times ?? []);
+
+  const _initFields = () => {
+    const existing = proposedTimes[0] ? parseExistingTime(proposedTimes[0]) : null;
+    return existing ?? tomorrow10am();
+  };
+  const [editDate, setEditDate] = useState(() => _initFields().date);
+  const [editStart, setEditStart] = useState(() => _initFields().start);
+  const [editEnd, setEditEnd] = useState(() => _initFields().end);
+  const [editTz, setEditTz] = useState(defaultTz);
 
   // Post-meeting form state
   const [step, setStep] = useState<"idle" | "form">("idle");
@@ -59,6 +123,32 @@ export function MeetingCard({ meeting, onUpdate }: { meeting: Meeting; onUpdate:
   async function handleConfirm() {
     setConfirming(true);
     try { await confirmMeeting(meeting.id); onUpdate(); } catch (e) { console.error(e); } finally { setConfirming(false); }
+  }
+
+  async function handleSaveTime() {
+    if (!editDate || !editStart) return;
+    setSavingTime(true);
+    try {
+      const display = buildDisplayString(editDate, editStart, editEnd);
+      const startIso = `${editDate}T${editStart}`;
+      const [sh, sm] = editStart.split(":").map(Number);
+      const [eh, em] = editEnd.split(":").map(Number);
+      const durationMinutes = Math.max(15, (eh * 60 + em) - (sh * 60 + sm));
+      const res = await updateMeetingTime(meeting.id, display, startIso, durationMinutes, editTz);
+      setProposedTimes([display]);
+      if (res.meet_link) setCalLink(res.meet_link);
+      setEditingTime(false);
+      onUpdate();
+    } catch (e) { console.error(e); } finally { setSavingTime(false); }
+  }
+
+  async function handleCreateCalendarEvent() {
+    setCreatingEvent(true);
+    try {
+      const res = await createCalendarEvent(meeting.id);
+      if (res.meet_link) setCalLink(res.meet_link);
+      onUpdate();
+    } catch (e) { console.error(e); } finally { setCreatingEvent(false); }
   }
 
   async function handleCancel() {
@@ -154,16 +244,71 @@ export function MeetingCard({ meeting, onUpdate }: { meeting: Meeting; onUpdate:
       )}
 
       {/* Proposed times */}
-      {meeting.proposed_times && meeting.proposed_times.length > 0 && (
-        <div>
-          <p className="text-xs text-gray-400 mb-1">Proposed times</p>
+      <div>
+        <div className="flex items-center justify-between mb-1">
+          <p className="text-xs text-gray-400">Meeting time</p>
+          {!editingTime && (
+            <button onClick={() => {
+              const f = proposedTimes[0] ? (parseExistingTime(proposedTimes[0]) ?? tomorrow10am()) : tomorrow10am();
+              setEditDate(f.date); setEditStart(f.start); setEditEnd(f.end);
+              setEditingTime(true);
+            }} className="text-xs text-blue-500 hover:underline">
+              Edit
+            </button>
+          )}
+        </div>
+        {editingTime ? (
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <input
+                type="date"
+                value={editDate}
+                onChange={e => setEditDate(e.target.value)}
+                className="bg-gray-100 rounded-md px-2.5 py-1.5 text-xs text-gray-700 border-0 focus:ring-2 focus:ring-blue-400 focus:outline-none cursor-pointer"
+              />
+              <input
+                type="time"
+                value={editStart}
+                onChange={e => setEditStart(e.target.value)}
+                className="bg-gray-100 rounded-md px-2.5 py-1.5 text-xs text-gray-700 border-0 focus:ring-2 focus:ring-blue-400 focus:outline-none cursor-pointer"
+              />
+              <span className="text-xs text-gray-400">to</span>
+              <input
+                type="time"
+                value={editEnd}
+                onChange={e => setEditEnd(e.target.value)}
+                className="bg-gray-100 rounded-md px-2.5 py-1.5 text-xs text-gray-700 border-0 focus:ring-2 focus:ring-blue-400 focus:outline-none cursor-pointer"
+              />
+              <select
+                value={editTz}
+                onChange={e => setEditTz(e.target.value)}
+                className="bg-gray-100 rounded-md px-2.5 py-1.5 text-xs text-gray-700 border-0 focus:ring-2 focus:ring-blue-400 focus:outline-none cursor-pointer"
+              >
+                {TIMEZONES.map(tz => (
+                  <option key={tz.value} value={tz.value}>{tz.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex gap-2 items-center">
+              <button onClick={handleSaveTime} disabled={savingTime || !editDate || !editStart}
+                className="text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-40 px-3 py-1.5 rounded-md">
+                {savingTime ? "Saving…" : "Save"}
+              </button>
+              <button onClick={() => setEditingTime(false)} className="text-xs text-gray-400 hover:text-gray-600">
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : proposedTimes.length > 0 ? (
           <ul className="flex flex-col gap-0.5">
-            {meeting.proposed_times.map((t, i) => (
+            {proposedTimes.map((t, i) => (
               <li key={i} className="text-xs text-gray-700 bg-gray-50 rounded px-2 py-1">{t}</li>
             ))}
           </ul>
-        </div>
-      )}
+        ) : (
+          <p className="text-xs text-gray-400 italic">No time set</p>
+        )}
+      </div>
 
       {/* Timestamps */}
       {meeting.confirmed_at && (
@@ -174,13 +319,17 @@ export function MeetingCard({ meeting, onUpdate }: { meeting: Meeting; onUpdate:
       )}
 
       {/* Meet link */}
-      {meeting.calendar_link && (
+      {calLink ? (
         <div className="flex items-center gap-3">
-          <a href={meeting.calendar_link} target="_blank" rel="noreferrer"
+          <a href={calLink} target="_blank" rel="noreferrer"
             className="text-xs text-blue-500 hover:underline font-medium">
             Join Google Meet →
           </a>
         </div>
+      ) : isConfirmed && (
+        <Button size="sm" variant="outline" disabled={creatingEvent} onClick={handleCreateCalendarEvent}>
+          {creatingEvent ? "Creating…" : "Create Calendar Event"}
+        </Button>
       )}
 
       {/* Saved notes (completed) */}

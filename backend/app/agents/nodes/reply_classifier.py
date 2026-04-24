@@ -35,6 +35,7 @@ def reply_classifier_node(state: AgentState) -> dict:
     prompt = f"""Classify this inbound reply and draft a response.
 
 Account: {account.get('name')}
+Location: {account.get('location', 'unknown')}
 Original outreach angle: {(state.get('strategy') or {}).get('angle', 'unknown')}
 
 Reply:
@@ -50,11 +51,21 @@ Classification guide:
 - unsubscribe: explicit opt-out
 - unclear: ambiguous, cannot determine intent
 
-Response guidelines:
-- interested: brief, enthusiastic, propose 2-3 specific times for a 20-min call
+Response guidelines for "interested":
+- If the prospect already proposed a specific time (e.g. "tomorrow 3pm"), confirm it directly — do NOT ask for timezone or format
+- Use the account location to infer timezone — never ask for it
+- Keep it 2-3 sentences max: confirm the time, say you'll send a calendar invite, and one sentence of genuine enthusiasm
+- Do NOT ask about preferred format (Zoom/phone/etc) — assume video call
+- Do NOT mention "20 minutes" or ROI walkthrough
+- Example tone: "Great, [time] works perfectly — I'll send a calendar invite shortly. Looking forward to connecting."
+
+Other classifications:
 - not_now: acknowledge, ask for better time
 - referral: thank them, ask for referral's contact info
-- not_a_fit: graceful close, leave door open
+- not_a_fit:
+  * If they mention another vendor/solution is already handling it (e.g. "we already use X", "someone else is helping us"): acknowledge briefly, then ask for the company name — e.g. "Totally understand — who are you currently working with, if you don't mind sharing?"
+  * Otherwise: ask one short, curious question about why it's not a fit — e.g. "Totally understand — mind sharing what's holding you back? Always looking to improve."
+  * Keep it 1-2 sentences. Never pitch again. Never mention ROI or features.
 - unsubscribe: empty string — do NOT draft a response
 - unclear: ask one clarifying question
 

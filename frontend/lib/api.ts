@@ -94,6 +94,7 @@ export async function searchCmsSnfs(params: {
   min_beds?: number;
   sort_by?: string;
   max_results?: number;
+  ownership?: string;
 }): Promise<{ count: number; results: CmsFacility[] }> {
   const qs = new URLSearchParams({
     state: params.state,
@@ -101,8 +102,15 @@ export async function searchCmsSnfs(params: {
     ...(params.min_beds != null ? { min_beds: String(params.min_beds) } : {}),
     ...(params.sort_by ? { sort_by: params.sort_by } : {}),
     ...(params.max_results ? { max_results: String(params.max_results) } : {}),
+    ...(params.ownership ? { ownership: params.ownership } : {}),
   });
   const res = await fetch(`${API}/accounts/cms-search?${qs}`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function getCmsCities(state: string): Promise<{ cities: string[] }> {
+  const res = await fetch(`${API}/accounts/cms-cities?state=${state}`);
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
@@ -123,6 +131,33 @@ export async function bulkImport(facilities: FacilityResult[]) {
   return res.json();
 }
 
+export async function bulkImportCms(facilities: CmsFacility[]) {
+  const payload = facilities.map(f => ({
+    name: f.name,
+    city: f.city,
+    state: f.state,
+    address: f.address,
+    phone: f.phone,
+    beds: f.beds,
+    stars: f.stars,
+    staffing_stars: f.staffing_stars,
+    nurse_turnover_pct: f.nurse_turnover_pct,
+    rn_turnover_pct: f.rn_turnover_pct,
+    penalties: f.penalties,
+    fines_usd: f.fines_usd,
+    ownership: f.ownership,
+    chain: f.chain,
+    ccn: f.ccn,
+  }));
+  const res = await fetch(`${API}/accounts/bulk-import`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ facilities: payload }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 export async function bookMeeting(
   accountId: string,
   proposedTime: string,
@@ -138,6 +173,33 @@ export async function bookMeeting(
 
 export async function confirmMeeting(id: string) {
   const res = await fetch(`${API}/meetings/${id}/confirm`, { method: "POST" });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function updateMeetingTime(
+  id: string,
+  proposedTime: string,
+  startIso: string,
+  durationMinutes: number,
+  timezone: string,
+): Promise<{ status: string; proposed_time: string; meet_link: string | null }> {
+  const res = await fetch(`${API}/meetings/${id}/time`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      proposed_time: proposedTime,
+      start_iso: startIso,
+      duration_minutes: durationMinutes,
+      timezone,
+    }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function createCalendarEvent(id: string): Promise<{ status: string; meet_link: string | null }> {
+  const res = await fetch(`${API}/meetings/${id}/create-calendar-event`, { method: "POST" });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
@@ -170,6 +232,42 @@ export async function generateMeetingNotes(id: string, notes: string, accountNam
 
 export async function sendReplyResponse(replyId: string) {
   const res = await fetch(`${API}/webhooks/replies/${replyId}/send-response`, { method: "POST" });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function updateReplyDraft(replyId: string, body: string) {
+  const res = await fetch(`${API}/webhooks/replies/${replyId}/draft`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ body }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function refineReplyDraft(replyId: string, draft: string, instruction: string): Promise<{ refined: string }> {
+  const res = await fetch(`${API}/webhooks/replies/${replyId}/refine`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ draft, instruction }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function approveReply(replyId: string) {
+  const res = await fetch(`${API}/webhooks/replies/${replyId}/approve`, { method: "POST" });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function manualReply(accountId: string, body: string, fromEmail: string) {
+  const res = await fetch(`${API}/webhooks/replies/manual`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ account_id: accountId, body, from_email: fromEmail }),
+  });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }

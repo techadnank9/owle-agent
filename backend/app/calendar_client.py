@@ -88,11 +88,12 @@ def create_meeting_event(
     attendee_email: str | None = None,
     duration_minutes: int = 30,
     location: str | None = None,
+    timezone_override: str | None = None,
 ) -> dict:
     """Create a Google Calendar event with Meet conferencing. Returns meet_link and event_link."""
     service = build_calendar_service()
 
-    tz = _location_to_timezone(location)
+    tz = timezone_override or _location_to_timezone(location)
     start_dt = _parse_proposed_time(proposed_time_str)
     end_dt = start_dt + timedelta(minutes=duration_minutes)
 
@@ -122,9 +123,56 @@ def create_meeting_event(
     return {"meet_link": meet_link, "event_link": event_link, "event_id": event["id"]}
 
 
+def update_meeting_event(
+    event_id: str,
+    summary: str,
+    proposed_time_str: str,
+    attendee_email: str | None = None,
+    duration_minutes: int = 30,
+    timezone_override: str | None = None,
+    location: str | None = None,
+) -> dict:
+    """Update an existing Google Calendar event's time. Returns updated meet_link."""
+    service = build_calendar_service()
+    tz = timezone_override or _location_to_timezone(location)
+    start_dt = _parse_proposed_time(proposed_time_str)
+    end_dt = start_dt + timedelta(minutes=duration_minutes)
+
+    patch_body = {
+        "start": {"dateTime": start_dt.isoformat(), "timeZone": tz},
+        "end":   {"dateTime": end_dt.isoformat(),   "timeZone": tz},
+    }
+    if attendee_email:
+        patch_body["attendees"] = [{"email": attendee_email}]
+
+    event = service.events().patch(
+        calendarId="primary",
+        eventId=event_id,
+        body=patch_body,
+        conferenceDataVersion=1,
+        sendUpdates="all" if attendee_email else "none",
+    ).execute()
+
+    entry_points = event.get("conferenceData", {}).get("entryPoints", [])
+    meet_link = next((ep["uri"] for ep in entry_points if ep.get("entryPointType") == "video"), "")
+    logger.info("Calendar event updated: %s", event_id)
+    return {"meet_link": meet_link, "event_id": event_id}
+
+
 def _parse_proposed_time(text: str) -> datetime:
-    """Parse '4 PM', '4 PM Today', '3:30 PM Tomorrow' into a datetime."""
+    """Parse ISO datetime or human strings like '4 PM Tomorrow' into a datetime."""
     today = datetime.now().date()
+
+    # ISO format: YYYY-MM-DDTHH:MM or YYYY-MM-DDTHH:MM:SS
+    iso_match = re.match(r'(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})', text)
+    if iso_match:
+        return datetime(
+            int(iso_match.group(1)[:4]),
+            int(iso_match.group(1)[5:7]),
+            int(iso_match.group(1)[8:10]),
+            int(iso_match.group(2)),
+            int(iso_match.group(3)),
+        )
 
     match = re.search(r'(\d{1,2})(?::(\d{2}))?\s*(am|pm)', text, re.IGNORECASE)
     if not match:
