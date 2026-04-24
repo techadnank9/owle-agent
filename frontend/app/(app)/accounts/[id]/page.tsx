@@ -206,7 +206,7 @@ export default function AccountDetailPage({ params }: { params: Promise<{ id: st
   const [auditLog, setAuditLog] = useState<AuditEntry[]>([]);
   const [enriching, setEnriching] = useState(false);
   const [enrichMsg, setEnrichMsg] = useState<string | null>(null);
-  const [apolloLoading, setApolloLoading] = useState(false);
+  const [contactLoading, setContactLoading] = useState<"apollo" | "hunter" | "apify" | null>(null);
   const [apolloMsg, setApolloMsg] = useState<string | null>(null);
   const [showOldRuns, setShowOldRuns] = useState(false);
   const [contacts, setContacts] = useState<{id: string; name: string | null; title: string; email: string | null; linkedin_url: string | null; source: string; confidence: number | null}[]>([]);
@@ -237,18 +237,11 @@ export default function AccountDetailPage({ params }: { params: Promise<{ id: st
     setApolloMsg(null);
     try {
       // Run enrichment + contact search in parallel
-      const [, contactRes] = await Promise.allSettled([
-        enrichAccount(id),
-        apolloEnrich(id),
-      ]);
-      const cr = contactRes.status === "fulfilled" ? contactRes.value : null;
-      const contactNote = cr
-        ? ` · ${cr.found} contact${cr.found !== 1 ? "s" : ""} found (${(cr.sources ?? []).join(", ")})`
-        : "";
-      setEnrichMsg(`⏳ Re-scoring running…${contactNote} reloading in 30s`);
+      await enrichAccount(id);
+      setEnrichMsg("⏳ Re-scoring running… reloading in 30s");
       setTimeout(() => {
         loadData();
-        setEnrichMsg(`✓ Done${contactNote}`);
+        setEnrichMsg("✓ Done");
         setEnriching(false);
       }, 30000);
     } catch (e: unknown) {
@@ -257,21 +250,21 @@ export default function AccountDetailPage({ params }: { params: Promise<{ id: st
     }
   }
 
-  async function handleApolloEnrich() {
-    setApolloLoading(true);
+  async function handleContactSearch(source: "apollo" | "hunter" | "apify") {
+    setContactLoading(source);
     setApolloMsg(null);
     try {
-      const res = await apolloEnrich(id);
+      const res = await apolloEnrich(id, source);
       if (res.found === 0) {
-        setApolloMsg("No contacts found.");
+        setApolloMsg(`${source}: no contacts found.`);
       } else {
-        setApolloMsg(`✓ ${res.found} contact${res.found !== 1 ? "s" : ""} found (${(res.sources ?? []).join(", ")}), ${res.upserted} saved.`);
+        setApolloMsg(`✓ ${source}: ${res.found} found, ${res.upserted} saved.`);
         loadData();
       }
     } catch (e: unknown) {
-      setApolloMsg(`Error: ${e instanceof Error ? e.message : String(e)}`);
+      setApolloMsg(`${source} error: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
-      setApolloLoading(false);
+      setContactLoading(null);
       setTimeout(() => setApolloMsg(null), 8000);
     }
   }
@@ -360,9 +353,17 @@ export default function AccountDetailPage({ params }: { params: Promise<{ id: st
             <Button variant="outline" size="sm" onClick={handleEnrich} disabled={enriching}>
               {enriching ? "Running…" : "Enrich & Re-score"}
             </Button>
-            <Button variant="outline" size="sm" onClick={handleApolloEnrich} disabled={apolloLoading}
+            <Button variant="outline" size="sm" onClick={() => handleContactSearch("apollo")} disabled={contactLoading !== null}
               className="border-purple-200 text-purple-700 hover:bg-purple-50">
-              {apolloLoading ? "Searching…" : "Find Contacts"}
+              {contactLoading === "apollo" ? "Searching…" : "Apollo"}
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => handleContactSearch("hunter")} disabled={contactLoading !== null}
+              className="border-blue-200 text-blue-700 hover:bg-blue-50">
+              {contactLoading === "hunter" ? "Searching…" : "Hunter"}
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => handleContactSearch("apify")} disabled={contactLoading !== null}
+              className="border-green-200 text-green-700 hover:bg-green-50">
+              {contactLoading === "apify" ? "Searching…" : "Apify"}
             </Button>
           </div>
         </div>

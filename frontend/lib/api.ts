@@ -115,8 +115,8 @@ export async function getCmsCities(state: string): Promise<{ cities: string[] }>
   return res.json();
 }
 
-export async function apolloEnrich(id: string): Promise<{ found: number; upserted: number; contacts: { name: string; title: string; email: string | null; linkedin_url: string | null }[] }> {
-  const res = await fetch(`${API}/accounts/${id}/apollo-enrich`, { method: "POST" });
+export async function apolloEnrich(id: string, source: "all" | "apollo" | "hunter" | "apify" = "all"): Promise<{ found: number; upserted: number; sources: string[]; contacts: { name: string; title: string; email: string | null; linkedin_url: string | null }[] }> {
+  const res = await fetch(`${API}/accounts/${id}/apollo-enrich?source=${source}`, { method: "POST" });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }

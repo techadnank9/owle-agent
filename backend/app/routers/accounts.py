@@ -721,7 +721,7 @@ async def add_emails(request: Request, body: PasteEmailsRequest):
 
 
 @router.post("/{account_id}/apollo-enrich")
-async def apollo_enrich(account_id: str):
+async def apollo_enrich(account_id: str, source: str = "all"):
     supabase = get_supabase()
 
     acct_res = supabase.table("accounts").select("id, name, location").eq("id", account_id).limit(1).execute()
@@ -733,45 +733,50 @@ async def apollo_enrich(account_id: str):
     sources_tried: list[str] = []
     errors: list[str] = []
 
+    run_all = source == "all"
+
     # Apollo
-    try:
-        from ..apollo_client import search_contacts as apollo_search
-        apollo_people = apollo_search(account["name"], account.get("location"))
-        for p in apollo_people:
-            p["source"] = "apollo"
-        people.extend(apollo_people)
-        sources_tried.append("apollo")
-    except Exception as e:
-        logger.warning("Apollo search skipped for %s: %s", account["name"], e)
-        errors.append(f"Apollo: {e}")
+    if run_all or source == "apollo":
+        try:
+            from ..apollo_client import search_contacts as apollo_search
+            apollo_people = apollo_search(account["name"], account.get("location"))
+            for p in apollo_people:
+                p["source"] = "apollo"
+            people.extend(apollo_people)
+            sources_tried.append("apollo")
+        except Exception as e:
+            logger.warning("Apollo search skipped for %s: %s", account["name"], e)
+            errors.append(f"Apollo: {e}")
 
     # Hunter.io
-    try:
-        from ..hunter_client import search_contacts as hunter_search
-        hunter_people = hunter_search(account["name"])
-        existing_emails = {p["email"] for p in people if p.get("email")}
-        for p in hunter_people:
-            if p.get("email") and p["email"] in existing_emails:
-                continue
-            people.append(p)
-        sources_tried.append("hunter")
-    except Exception as e:
-        logger.warning("Hunter search skipped for %s: %s", account["name"], e)
-        errors.append(f"Hunter: {e}")
+    if run_all or source == "hunter":
+        try:
+            from ..hunter_client import search_contacts as hunter_search
+            hunter_people = hunter_search(account["name"])
+            existing_emails = {p["email"] for p in people if p.get("email")}
+            for p in hunter_people:
+                if p.get("email") and p["email"] in existing_emails:
+                    continue
+                people.append(p)
+            sources_tried.append("hunter")
+        except Exception as e:
+            logger.warning("Hunter search skipped for %s: %s", account["name"], e)
+            errors.append(f"Hunter: {e}")
 
-    # Apify email finder (free — finds emails via company domain)
-    try:
-        from ..apify_leads_client import search_contacts as apify_search
-        apify_people = apify_search(account["name"], account.get("location"))
-        existing_emails = {p["email"] for p in people if p.get("email")}
-        for p in apify_people:
-            if p.get("email") and p["email"] in existing_emails:
-                continue
-            people.append(p)
-        sources_tried.append("apify")
-    except Exception as e:
-        logger.warning("Apify search skipped for %s: %s", account["name"], e)
-        errors.append(f"Apify: {e}")
+    # Apify email finder
+    if run_all or source == "apify":
+        try:
+            from ..apify_leads_client import search_contacts as apify_search
+            apify_people = apify_search(account["name"], account.get("location"))
+            existing_emails = {p["email"] for p in people if p.get("email")}
+            for p in apify_people:
+                if p.get("email") and p["email"] in existing_emails:
+                    continue
+                people.append(p)
+            sources_tried.append("apify")
+        except Exception as e:
+            logger.warning("Apify search skipped for %s: %s", account["name"], e)
+            errors.append(f"Apify: {e}")
 
     if not people and errors:
         raise HTTPException(status_code=502, detail="; ".join(errors))
