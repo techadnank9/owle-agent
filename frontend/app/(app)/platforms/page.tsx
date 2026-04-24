@@ -107,7 +107,7 @@ const PHASES = [
         plan: "Basic",
         cost: "~$49–59/mo",
         status: "buy-now" as const,
-        why: "Fixes the 403 error on free plan. Basic unlocks People Search API + Person API for contact lookup — what Owle uses. 1,000 export credits/mo from 275M contact database.",
+        why: "Fixes the 403 error on free plan. Basic unlocks People Search API + Person API for contact lookup — what Owle uses. 2,500 credits/mo (30,000/year) from 275M contact database. $49/mo billed annually.",
         link: "https://www.apollo.io/pricing",
         note: "⚠ Pricing page is JS-rendered — no public prices. ~$49/mo annual, ~$59/mo monthly based on public reports. Advanced bulk API needs Custom plan (sales call).",
       },
@@ -219,7 +219,7 @@ const TOOLS = [
     owle_plan: "Basic",
     owle_cost: "~$49–59/mo",
     api_tier: "Basic = People Search API. Custom = full advanced API.",
-    credits: "1,000 export/mo",
+    credits: "2,500 credits/mo (30k/yr)",
     note: "Free plan returns 403 on all API endpoints. Basic fixes this. Pricing page is JS-rendered — prices unconfirmed from official source.",
   },
   {
@@ -317,9 +317,9 @@ const PLATFORMS: Platform[] = [
     has_phones: true,
     has_sequences: true,
     plans: [
-      { name: "Basic", billed_monthly: "$49/mo", billed_annual: "", credits: "1,000 export credits/mo", key_features: "Email sequences, Salesforce/HubSpot integrations" },
-      { name: "Professional", billed_monthly: "$99/mo", billed_annual: "", credits: "2,000 export credits/mo", key_features: "Buying intent signals, AI email writing, A/B testing" },
-      { name: "Organization", billed_monthly: "Custom (sales call)", billed_annual: "", credits: "Up to 1M credits/year", key_features: "Higher API rate limits, SSO, custom roles, dedicated CSM" },
+      { name: "Basic", billed_monthly: "$49/mo (annual) · ~$59/mo (monthly)", billed_annual: "", credits: "2,500 credits/mo (30,000/year) · 250 emails/day cap", key_features: "API access, email sequences, CRM integrations, waterfall enrichment" },
+      { name: "Professional", billed_monthly: "$79/mo (annual) · ~$99/mo (monthly)", billed_annual: "", credits: "4,000 credits/mo (48,000/year) · unlimited daily sends", key_features: "A/Z testing, unlimited mailboxes, automated workflows, call recordings" },
+      { name: "Organization", billed_monthly: "$119/mo (annual, min 3 seats)", billed_annual: "", credits: "6,000 credits/mo (72,000/year)", key_features: "SSO, custom reports, own LLM API key, advanced security, dedicated CSM" },
     ],
     pros: [
       "Largest database — 275M+ contacts, 73M+ companies",
@@ -330,7 +330,7 @@ const PLATFORMS: Platform[] = [
       "LinkedIn Chrome extension for real-time enrichment",
     ],
     cons: [
-      "Free plan blocks all API endpoints — must be on Basic ($49/mo) or higher for API access",
+      "Free plan blocks all API endpoints — must be on Basic ($49/mo annual) or higher for API access",
       "Data accuracy inconsistent — mobile numbers especially",
       "Export vs. view credits confusing and limiting",
       "Pricing changes frequently without notice",
@@ -338,7 +338,7 @@ const PLATFORMS: Platform[] = [
       "Sequences limited on lower plans",
     ],
     best_for: "SMB/mid-market sales teams wanting all-in-one prospecting + outreach at mid-range price",
-    data_note: "Apollo's pricing page uses dynamic JS — figures confirmed via public sources. API access available on Basic ($49/mo)+. Free plan returns 403 on all API endpoints.",
+    data_note: "Apollo's pricing page uses dynamic JS — figures confirmed from actual pricing page. Basic = $49/mo annual ($59 monthly), 30,000 credits/year (2,500/mo), 250 daily email cap. Professional = $79/mo annual. API access on Basic+. Free plan returns 403 on all API endpoints.",
   },
   {
     name: "Hunter.io",
@@ -794,7 +794,7 @@ export default function PlatformsPage() {
             <thead>
               <tr className="border-b bg-gray-50">
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Feature</th>
-                <th className="text-center px-4 py-3 text-xs font-medium text-gray-500">Apollo Basic<br/><span className="font-normal text-gray-400">$49/mo alone</span></th>
+                <th className="text-center px-4 py-3 text-xs font-medium text-gray-500">Apollo Basic<br/><span className="font-normal text-gray-400">$49/mo annual billing</span></th>
                 <th className="text-center px-4 py-3 text-xs font-medium text-gray-500">Hunter Starter<br/><span className="font-normal text-gray-400">$49/mo alone</span></th>
                 <th className="text-center px-4 py-3 text-xs font-medium text-blue-700 bg-blue-50 border-x border-blue-100">Owle — Phase 1<br/><span className="font-normal text-blue-400">~$66–76/mo</span></th>
               </tr>
@@ -892,7 +892,7 @@ export default function PlatformsPage() {
               <li className="flex gap-2"><span className="text-gray-400 shrink-0">→</span><span><strong>Simpler to start.</strong> No code, no integration work. Log in, search, export. Good for a solo rep who isn't building a workflow.</span></li>
               <li className="flex gap-2"><span className="text-gray-400 shrink-0">→</span><span><strong>One bill, one login.</strong> Easier to manage if your team doesn't have engineering resources.</span></li>
               <li className="flex gap-2"><span className="text-gray-400 shrink-0">→</span><span><strong>Built-in outreach.</strong> Apollo and Snov.io bundle email sequencing — useful if you don't have a separate sending tool.</span></li>
-              <li className="flex gap-2"><span className="text-gray-400 shrink-0">→</span><span><strong>When data volume is high.</strong> Apollo Professional at $99/mo gives 2,000 exports — cheaper per contact than paying Apify per-run at scale.</span></li>
+              <li className="flex gap-2"><span className="text-gray-400 shrink-0">→</span><span><strong>When data volume is high.</strong> Apollo Professional at $79/mo (annual) gives 4,000 credits/mo — cheaper per contact than paying Apify per-run at scale.</span></li>
             </ul>
             <div className="mt-4 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
               <p className="text-xs text-amber-700"><strong>Bottom line:</strong> If you're sending &lt;500 outreach/mo and have a technical workflow (like Owle), individual free/cheap APIs win on cost. Above 2,000 contacts/mo, Apollo Professional or Snov.io Pro S starts making sense as a primary source.</p>
@@ -920,7 +920,7 @@ export default function PlatformsPage() {
           <tbody>
             {[
               { src: "Hunter.io", plan: "Starter", monthly: "$49/mo", credits: "2,000", per1k: "~$24.50" },
-              { src: "Apollo.io", plan: "Basic", monthly: "$49/mo", credits: "1,000", per1k: "~$49" },
+              { src: "Apollo.io", plan: "Basic (annual)", monthly: "$49/mo", credits: "2,500", per1k: "~$19.60" },
               { src: "Snov.io", plan: "Starter", monthly: "$39/mo", credits: "1,000", per1k: "~$39" },
               { src: "Instantly.ai", plan: "Credits — Growth", monthly: "$47/mo", credits: "~1,750", per1k: "~$26.85" },
               { src: "Lusha", plan: "Starter", monthly: "$49.90/mo", credits: "400", per1k: "~$124.75" },
