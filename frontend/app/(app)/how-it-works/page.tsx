@@ -10,29 +10,30 @@ export default function HowItWorksPage() {
       <div className="flex flex-col gap-0">
         <Step
           number={1}
-          title="Add Accounts"
+          title="Find & Import Facilities"
           color="blue"
-          description="You provide accounts via CSV upload or by pasting email addresses. Each row/email creates one account in the database."
+          description="Search the CMS Care Compare database (every SNF in the US) or upload a CSV / paste email addresses."
           details={[
-            "CSV columns: name, type, bed_count, location (any extras are stored in raw_data)",
-            "Pasted emails: domain name is used as the account name",
-            "Each account gets status = new",
+            "CMS Search: filter by state, city, ownership type, min beds — all data sourced directly from Medicare",
+            "Each result shows beds, CMS star rating, nurse turnover %, RN turnover %, penalties, and fines",
+            "Select facilities and Import — all CMS quality data is carried through, no re-lookup needed",
+            "CSV upload and email paste also supported for manual lists",
           ]}
-          tag="Accounts page"
+          tag="Search SNFs page"
         />
 
         <Connector />
 
         <Step
           number={2}
-          title="Account Selector — ICP & Priority Scoring"
+          title="ICP & Priority Scoring"
           color="indigo"
-          description="Claude scores each account against Owle AI's Ideal Customer Profile (skilled nursing facilities with 60+ beds)."
+          description="Every imported facility is scored on two axes: ICP fit (is it the right type of customer?) and Priority (how urgently do they need Owle?)."
           details={[
-            "ICP Score 0–100: how well the facility matches the target customer",
-            "Priority Score 0–100: urgency of outreach (boosted by bed count, multi-facility, pain signals)",
-            "Recommendation: pursue / pause / exclude",
-            "Only pursue accounts move forward",
+            "ICP Score 0–100 — fit: 90–100 = confirmed SNF ≥60 beds, 60–89 = likely SNF, <60 = marginal or excluded",
+            "Priority Score 0–100 — pain signals stacked: nurse turnover ≥75% (+35), 1-star CMS rating (+30), 5+ penalties (+25), RN turnover ≥50% (+20)",
+            "Low stars + high turnover + penalties = highest priority (facility is actively struggling)",
+            "Recommendation: pursue → in_outreach, pause → held, exclude → removed from pipeline",
           ]}
           tag="Agent node"
         />

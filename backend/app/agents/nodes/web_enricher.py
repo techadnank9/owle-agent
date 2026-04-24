@@ -373,57 +373,93 @@ def web_enricher_node(state: AgentState) -> dict:
     state_abbr = raw_state.strip()[:2].upper() if raw_state and len(raw_state.strip()) >= 2 else None
 
     cms_enriched: dict = {}
-    cms_record = _cms_lookup(name, state_abbr, city)
-    if cms_record:
-        cms_enriched = _parse_cms_record(cms_record)
-        account_data.update(cms_enriched)
-
-        db_update: dict = {}
-        if cms_enriched.get("bed_count"):
-            db_update["bed_count"] = cms_enriched["bed_count"]
-        if cms_enriched.get("location") and not account_data.get("location"):
-            db_update["location"] = cms_enriched["location"]
-        if db_update:
-            update_account(state["account_id"], db_update)
-
-        fines = cms_enriched.get("cms_fines_count", "0")
-        fines_usd = cms_enriched.get("cms_fines_total_usd", "0")
-        penalties = cms_enriched.get("cms_total_penalties", "0")
-        abuse_flag = cms_enriched.get("cms_abuse_flag", "N")
-        inspection_overdue = cms_enriched.get("cms_inspection_overdue", "N")
+    cms_record = None
+    if account_data.get("cms_matched"):
+        # CMS data pre-loaded from bulk import — skip API re-lookup
+        cms_enriched = {
+            k: account_data[k] for k in (
+                "bed_count", "cms_overall_rating", "cms_staffing_rating",
+                "nursing_staff_turnover_pct", "rn_turnover_pct",
+                "cms_total_penalties", "cms_fines_total_usd", "ownership_type",
+                "chain", "ccn", "cms_matched",
+            ) if account_data.get(k) is not None
+        }
         nurse_turnover = cms_enriched.get("nursing_staff_turnover_pct", "unknown")
         rn_turnover = cms_enriched.get("rn_turnover_pct", "unknown")
-        admin_turnover = cms_enriched.get("admin_turnover_count", "0")
-
+        penalties = cms_enriched.get("cms_total_penalties", "0")
+        fines_usd = cms_enriched.get("cms_fines_total_usd", "0")
         pain_signals = []
-        if fines and fines != "0": pain_signals.append(f"{fines} CMS fines (${fines_usd})")
         if penalties and penalties != "0": pain_signals.append(f"{penalties} total penalties")
-        if abuse_flag == "Y": pain_signals.append("abuse flag on record")
-        if inspection_overdue == "Y": pain_signals.append("health inspection overdue >2 years")
         if nurse_turnover != "unknown" and float(nurse_turnover) > 50: pain_signals.append(f"high nurse turnover ({nurse_turnover}%)")
         if rn_turnover != "unknown" and float(rn_turnover) > 30: pain_signals.append(f"high RN turnover ({rn_turnover}%)")
-        if admin_turnover and admin_turnover != "0": pain_signals.append(f"{admin_turnover} administrator(s) left")
-
         write_audit_log(
             account_id=state["account_id"],
             agent_run_id=state["agent_run_id"],
             node="web_enricher",
-            action=f"CMS matched — beds={cms_enriched.get('bed_count', 'unknown')}, "
+            action=f"CMS data pre-loaded from import — beds={cms_enriched.get('bed_count', 'unknown')}, "
                    f"rating={cms_enriched.get('cms_overall_rating', '?')}/5, "
                    f"staffing={cms_enriched.get('cms_staffing_rating', '?')}/5, "
                    f"ownership={cms_enriched.get('ownership_type', 'unknown')}",
             rationale=(
-                f"Provider: {cms_enriched.get('cms_provider_name', name)}. "
-                f"Avg residents/day: {cms_enriched.get('avg_residents_per_day', 'unknown')}. "
+                f"CMS data passed directly from CMS search import (no API re-lookup needed). "
                 f"Nurse turnover: {nurse_turnover}%, RN turnover: {rn_turnover}%. "
                 f"Pain signals: {', '.join(pain_signals) if pain_signals else 'none detected'}."
             ),
             verified_facts={k: v for k, v in cms_enriched.items() if k != "cms_matched"},
             inferred_assumptions={},
         )
-        # If we got bed_count from CMS, no need for Tavily
-        if cms_enriched.get("bed_count"):
-            pass  # continue to contact enrichment below
+    else:
+        cms_record = _cms_lookup(name, state_abbr, city)
+        if cms_record:
+            cms_enriched = _parse_cms_record(cms_record)
+            account_data.update(cms_enriched)
+
+            db_update: dict = {}
+            if cms_enriched.get("bed_count"):
+                db_update["bed_count"] = cms_enriched["bed_count"]
+            if cms_enriched.get("location") and not account_data.get("location"):
+                db_update["location"] = cms_enriched["location"]
+            if db_update:
+                try:
+                    update_account(state["account_id"], db_update)
+                except Exception as e:
+                    print(f"[web_enricher] db update failed (non-fatal): {e}")
+
+            fines = cms_enriched.get("cms_fines_count", "0")
+            fines_usd = cms_enriched.get("cms_fines_total_usd", "0")
+            penalties = cms_enriched.get("cms_total_penalties", "0")
+            abuse_flag = cms_enriched.get("cms_abuse_flag", "N")
+            inspection_overdue = cms_enriched.get("cms_inspection_overdue", "N")
+            nurse_turnover = cms_enriched.get("nursing_staff_turnover_pct", "unknown")
+            rn_turnover = cms_enriched.get("rn_turnover_pct", "unknown")
+            admin_turnover = cms_enriched.get("admin_turnover_count", "0")
+
+            pain_signals = []
+            if fines and fines != "0": pain_signals.append(f"{fines} CMS fines (${fines_usd})")
+            if penalties and penalties != "0": pain_signals.append(f"{penalties} total penalties")
+            if abuse_flag == "Y": pain_signals.append("abuse flag on record")
+            if inspection_overdue == "Y": pain_signals.append("health inspection overdue >2 years")
+            if nurse_turnover != "unknown" and float(nurse_turnover) > 50: pain_signals.append(f"high nurse turnover ({nurse_turnover}%)")
+            if rn_turnover != "unknown" and float(rn_turnover) > 30: pain_signals.append(f"high RN turnover ({rn_turnover}%)")
+            if admin_turnover and admin_turnover != "0": pain_signals.append(f"{admin_turnover} administrator(s) left")
+
+            write_audit_log(
+                account_id=state["account_id"],
+                agent_run_id=state["agent_run_id"],
+                node="web_enricher",
+                action=f"CMS matched — beds={cms_enriched.get('bed_count', 'unknown')}, "
+                       f"rating={cms_enriched.get('cms_overall_rating', '?')}/5, "
+                       f"staffing={cms_enriched.get('cms_staffing_rating', '?')}/5, "
+                       f"ownership={cms_enriched.get('ownership_type', 'unknown')}",
+                rationale=(
+                    f"Provider: {cms_enriched.get('cms_provider_name', name)}. "
+                    f"Avg residents/day: {cms_enriched.get('avg_residents_per_day', 'unknown')}. "
+                    f"Nurse turnover: {nurse_turnover}%, RN turnover: {rn_turnover}%. "
+                    f"Pain signals: {', '.join(pain_signals) if pain_signals else 'none detected'}."
+                ),
+                verified_facts={k: v for k, v in cms_enriched.items() if k != "cms_matched"},
+                inferred_assumptions={},
+            )
 
     # Step 2: Apify website contact scraper — runs always when website URL exists
     website = account_data.get("website", "")

@@ -65,27 +65,42 @@ def account_selector_node(state: AgentState) -> dict:
 
     prompt = f"""Score this account against Owle AI's ideal customer profile.
 
-ICP: Skilled nursing facilities (SNFs) with 60+ patient beds. Owle AI sells operational AI tools that reduce documentation burden, improve care coordination, and help with staffing workflows.
+ICP: Skilled nursing facilities (SNFs) with 60+ patient beds. Owle AI sells operational AI tools that reduce documentation burden, improve care coordination, and reduce staffing overhead.
 
 Account data:
 {json.dumps(account, indent=2)}{cms_context}
 
-Priority scoring rules — stack these bonuses for priority_score:
-- Nurse turnover ≥50%: +25 (severe staffing crisis — perfect fit for Owle)
-- Nurse turnover 30-49%: +15
-- RN turnover ≥30%: +15
-- Star rating ≤2: +20 (facility actively struggling)
-- Star rating 3: +10
-- CMS penalties > 0: +15
-- Bed count ≥200: +20
-- Bed count ≥100: +10
-- Bed count ≥60: +5
+Priority scoring rules — these are PAIN signals. Stack bonuses for priority_score:
+
+NURSE TURNOVER (biggest signal — high turnover = urgent need for staffing tools):
+- Nurse turnover ≥75%: +35
+- Nurse turnover 50–74%: +25
+- Nurse turnover 30–49%: +15
+
+RN TURNOVER:
+- RN turnover ≥50%: +20
+- RN turnover 30–49%: +12
+
+CMS STAR RATING (lower = more pain):
+- 1 star: +30
+- 2 stars: +20
+- 3 stars: +10
+
+CMS PENALTIES (enforcement = compliance crisis):
+- 5+ penalties: +25
+- 2–4 penalties: +15
+- 1 penalty: +8
+
+SIZE (secondary — bigger = more value):
+- Beds ≥200: +10
+- Beds ≥100: +5
+
 Cap priority_score at 100.
 
 ICP scoring rules:
 - 90-100: confirmed SNF ≥60 beds
-- 60-89: SNF, uncertain size
-- 30-59: marginal fit
+- 60-89: SNF, uncertain size or slightly under 60 beds
+- 30-59: marginal fit (non-SNF, very small, or unclear)
 - 0-29: clear mismatch
 
 - verified_facts: only what is explicitly in the data above
@@ -94,17 +109,38 @@ ICP scoring rules:
 
 Call score_account."""
 
-    msg = call_claude(prompt, tools=[SCORE_ACCOUNT_TOOL])
-    tool_use = next((b for b in msg.content if b.type == "tool_use"), None)
+    try:
+        msg = call_claude(prompt, tools=[SCORE_ACCOUNT_TOOL])
+        tool_use = next((b for b in msg.content if b.type == "tool_use"), None)
+    except Exception as e:
+        tool_use = None
+        print(f"[account_selector] Claude API failed: {e}")
 
     if not tool_use:
+        # Deterministic fallback when Claude is unavailable — mirrors the prompt scoring rules
+        beds = int(float(account.get("bed_count") or 0))
+        icp = 90 if beds >= 60 else (60 if beds > 0 else 40)
+        try: turnover = float(account.get("nursing_staff_turnover_pct") or 0)
+        except (ValueError, TypeError): turnover = 0
+        try: rn = float(account.get("rn_turnover_pct") or 0)
+        except (ValueError, TypeError): rn = 0
+        try: stars = int(float(account.get("cms_overall_rating") or 5))
+        except (ValueError, TypeError): stars = 5
+        try: penalties = int(float(account.get("cms_total_penalties") or 0))
+        except (ValueError, TypeError): penalties = 0
+        nurse_pts = 35 if turnover >= 75 else 25 if turnover >= 50 else 15 if turnover >= 30 else 0
+        rn_pts    = 20 if rn >= 50 else 12 if rn >= 30 else 0
+        star_pts  = 30 if stars == 1 else 20 if stars == 2 else 10 if stars == 3 else 0
+        pen_pts   = 25 if penalties >= 5 else 15 if penalties >= 2 else 8 if penalties >= 1 else 0
+        size_pts  = 10 if beds >= 200 else 5 if beds >= 100 else 0
+        priority = min(nurse_pts + rn_pts + star_pts + pen_pts + size_pts, 100)
         result = {
-            "icp_score": 50.0,
-            "priority_score": 50.0,
-            "icp_rationale": "Could not score — Claude did not return structured output",
-            "verified_facts": {},
+            "icp_score": float(icp),
+            "priority_score": float(priority),
+            "icp_rationale": "Scored deterministically from CMS signals (Claude API unavailable)",
+            "verified_facts": {k: account.get(k) for k in ("bed_count", "cms_overall_rating", "nursing_staff_turnover_pct") if account.get(k)},
             "inferred_assumptions": {},
-            "recommendation": "pause",
+            "recommendation": "pursue" if icp >= 60 else "pause",
         }
     else:
         result = tool_use.input

@@ -16,8 +16,22 @@ type Account = {
   icp_score: number | null;
   priority_score: number | null;
   status: string;
+  created_at: string | null;
   raw_data: Record<string, unknown> | null;
 };
+
+type SortKey = "priority_score" | "icp_score" | "name" | "bed_count" | "status" | "created_at";
+
+function sortAccounts(accounts: Account[], key: SortKey): Account[] {
+  return [...accounts].sort((a, b) => {
+    if (key === "name") return (a.name ?? "").localeCompare(b.name ?? "");
+    if (key === "status") return (a.status ?? "").localeCompare(b.status ?? "");
+    if (key === "created_at") return (b.created_at ?? "").localeCompare(a.created_at ?? "");
+    const av = (a[key] as number | null) ?? -1;
+    const bv = (b[key] as number | null) ?? -1;
+    return bv - av;
+  });
+}
 
 export default function AccountsPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -26,13 +40,13 @@ export default function AccountsPage() {
   const [enriching, setEnriching] = useState(false);
   const [enrichMsg, setEnrichMsg] = useState<string | null>(null);
   const [selectMode, setSelectMode] = useState(false);
+  const [sortKey, setSortKey] = useState<SortKey>("priority_score");
 
   const load = useCallback(async () => {
     setLoading(true);
     const { data } = await supabase
       .from("accounts")
-      .select("id,name,type,bed_count,location,icp_score,priority_score,status,raw_data")
-      .order("priority_score", { ascending: false, nullsFirst: false });
+      .select("id,name,type,bed_count,location,icp_score,priority_score,status,created_at,raw_data");
     setAccounts(data ?? []);
     setLoading(false);
   }, []);
@@ -87,6 +101,18 @@ export default function AccountsPage() {
         <div className="flex items-center gap-2">
           {!selectMode ? (
             <>
+              <select
+                className="border rounded-lg px-2 py-1.5 text-sm text-gray-700 bg-white"
+                value={sortKey}
+                onChange={e => setSortKey(e.target.value as SortKey)}
+              >
+                <option value="priority_score">Priority Score</option>
+                <option value="icp_score">ICP Score</option>
+                <option value="bed_count">Beds</option>
+                <option value="name">Name A–Z</option>
+                <option value="status">Status</option>
+                <option value="created_at">Newest</option>
+              </select>
               <Button variant="outline" size="sm" onClick={() => { setSelectMode(true); setEnrichMsg(null); }}>
                 Select & Enrich
               </Button>
@@ -117,7 +143,7 @@ export default function AccountsPage() {
         <p className="text-sm text-gray-400">No accounts yet — upload a CSV to get started.</p>
       ) : (
         <div className="flex flex-col gap-2">
-          {accounts.map((a) => (
+          {sortAccounts(accounts, sortKey).map((a) => (
             <div key={a.id} className={`flex items-center gap-2 ${selectMode ? "cursor-pointer" : ""}`}
               onClick={selectMode ? () => toggleSelect(a.id) : undefined}>
               {selectMode && (

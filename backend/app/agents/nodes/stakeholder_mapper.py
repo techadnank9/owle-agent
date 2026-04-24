@@ -55,8 +55,12 @@ Rules:
 
 Call map_stakeholders."""
 
-    msg = call_claude(prompt, tools=[MAP_STAKEHOLDERS_TOOL])
-    tool_use = next((b for b in msg.content if b.type == "tool_use"), None)
+    try:
+        msg = call_claude(prompt, tools=[MAP_STAKEHOLDERS_TOOL])
+        tool_use = next((b for b in msg.content if b.type == "tool_use"), None)
+    except Exception as e:
+        tool_use = None
+        print(f"[stakeholder_mapper] Claude API failed: {e}")
 
     if not tool_use:
         contacts_data = []
